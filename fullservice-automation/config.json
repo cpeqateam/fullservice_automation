@@ -1,0 +1,48 @@
+{
+  "_aciklama": "FULL Servis topoloji ve varsayilan test parametreleri. Sunucu ve agent bu dosyayi okur. Degerleri ortaminiza gore guncelleyin (IP'ler, youtube linki, sure).",
+
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8770,
+    "lan_ip": "192.168.1.10"
+  },
+
+  "agent_port": 8771,
+
+  "defaults": {
+    "modem_ip": "192.168.1.1",
+    "internet_ip": "8.8.8.8",
+    "youtube_link": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "iperf_port": 5201,
+    "iperf_parallel": 4,
+    "duration": 60
+  },
+
+  "nodes": [
+    {
+      "id": "server",
+      "label": "Linux Sunucu (Kablo)",
+      "conn": "cable",
+      "is_server": true,
+      "roles": ["ping_internet", "ping_modem", "youtube"]
+    },
+    {
+      "id": "mac_cable",
+      "label": "MAC (Kablo)",
+      "conn": "cable",
+      "roles": ["youtube", "ping_modem", "ping_internet", "iperf"]
+    },
+    {
+      "id": "win_wifi",
+      "label": "WINDOWS (Wi-Fi)",
+      "conn": "wifi",
+      "roles": ["youtube", "ping_modem", "ping_internet", "torrent", "wifi_track"]
+    },
+    {
+      "id": "mac_wifi",
+      "label": "MAC (Wi-Fi)",
+      "conn": "wifi",
+      "roles": ["youtube", "ping_modem", "ping_internet", "iperf", "wifi_track"]
+    }
+  ]
+}

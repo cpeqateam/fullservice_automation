@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v -E '\\\\.\\(xlsx|txt|log|DS_Store\\)$')",
+      "Bash(grep -v -E '\\\\.\\(xlsx|txt|log|DS_Store|exe|pyd|dll\\)$')",
+      "Bash(ls -la \"C:/Users/cpete/.claude/projects/c--Users-cpete-OneDrive-Masa-st--SCRIPTS-antigravity-fullservice-automation/memory/\")",
+      "Bash(cat \"C:/Users/cpete/.claude/projects/c--Users-cpete-OneDrive-Masa-st--SCRIPTS-antigravity-fullservice-automation/memory/MEMORY.md\")",
+      "Bash(python -m py_compile common/*.py common/runners/*.py agent/*.py server/*.py run_server.py run_agent.py)",
+      "Bash(python -c ' *)",
+      "Bash(timeout 40 python \"C:/Users/cpete/AppData/Local/Temp/fs_smoke_e2e.py\")",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(rm -f \"C:/Users/cpete/AppData/Local/Temp/fs_smoke_e2e.py\" \"C:/Users/cpete/AppData/Local/Temp/fs_smoke_cfg.json\")",
+      "Bash(rm -rf logs/FS_*)",
+      "Bash(rm -rf common/__pycache__ common/runners/__pycache__ agent/__pycache__ server/__pycache__)"
+    ]
+  }
+}
