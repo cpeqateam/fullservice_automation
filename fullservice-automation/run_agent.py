@@ -1,25 +1,32 @@
 """
 Agent'ı başlatan kısa yol (Mac/Windows client).
 
-    python run_agent.py <node_id> [server_url]
+    python run_agent.py <node_id> [server_url] [port]
 
 Örnek:
     python run_agent.py mac_cable
     python run_agent.py win_wifi http://192.168.1.10:8770
+    # Tek makinede iki agent — farklı portlar:
+    python run_agent.py mac_cable http://127.0.0.1:8770 8771
+    python run_agent.py mac_wifi  http://127.0.0.1:8770 8772
 
 node_id config.json'daki bir düğüm id'si olmalı (mac_cable / win_wifi / mac_wifi).
+[port] verilmezse config.json'daki agent_port (varsayılan 8771) kullanılır.
+Aynı makinede birden fazla agent çalıştıracaksan her birine FARKLI port ver.
 """
 import os
 import sys
 
 if len(sys.argv) < 2:
-    print("Kullanim: python run_agent.py <node_id> [server_url]")
+    print("Kullanim: python run_agent.py <node_id> [server_url] [port]")
     print("  node_id: mac_cable | win_wifi | mac_wifi")
     sys.exit(1)
 
 os.environ["FS_NODE_ID"] = sys.argv[1]
 if len(sys.argv) >= 3:
     os.environ["FS_SERVER_URL"] = sys.argv[2]
+if len(sys.argv) >= 4:
+    os.environ["FS_AGENT_PORT"] = sys.argv[3]
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
