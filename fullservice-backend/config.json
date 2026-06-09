@@ -12,7 +12,7 @@
   "defaults": {
     "modem_ip": "192.168.1.1",
     "internet_ip": "8.8.8.8",
-    "youtube_link": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "youtube_link": "https://youtu.be/uXNU0XgGZhs",
     "iperf_port": 5201,
     "iperf_parallel": 4,
     "duration": 60

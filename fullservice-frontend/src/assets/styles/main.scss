@@ -1,0 +1,52 @@
+// Global stiller. Bileşen-içi SCSS bunların üzerine binayı tamamlar.
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+// Vuetify konteynerinin opak arka planını şeffaf yap ki LiquidBackground görünsün.
+.v-application,
+.v-application__wrap {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+// Scrollbar — koyu temaya uygun ince
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+
+// Türk Telekom magenta vurgusu — başlıklar/marka için yardımcı sınıf
+.tt-gradient-text {
+  background: linear-gradient(45deg, #E20074, #FF4FAA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// Tüm "glass" görünümlü kartlar için tek-yer kontrolü
+.v-application.v-theme--dark {
+  .v-card { color: rgba(255, 255, 255, 0.92); }
+  .v-text-field .v-field { background: rgba(255, 255, 255, 0.04) !important; }
+}
+
+.v-application.v-theme--light {
+  .v-card {
+    background: rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    color: rgba(0, 0, 0, 0.87);
+  }
+  .v-text-field .v-field { background: rgba(255, 255, 255, 0.6) !important; }
+  .v-app-bar { background: rgba(255, 255, 255, 0.7) !important; }
+  .v-footer  { background: rgba(255, 255, 255, 0.5) !important; }
+}
+
+// Vuetify progress-linear varsayılan arka plan opaklığı (test çubukları için)
+.v-progress-linear__background { opacity: 0.18 !important; }

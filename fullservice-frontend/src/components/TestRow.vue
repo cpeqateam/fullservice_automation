@@ -1,0 +1,63 @@
+<template>
+  <div class="test-row">
+    <div class="row-line">
+      <span class="row-name">
+        <v-icon :icon="testIcon" size="14" class="mr-1 opacity-70" />
+        {{ label }}
+      </span>
+      <span class="row-pct">{{ pct }}%</span>
+    </div>
+    <v-progress-linear
+      :model-value="pct"
+      :color="barColor"
+      :indeterminate="false"
+      height="8"
+      rounded
+      :class="status === 'running' ? 'bar-pulse' : ''"
+    />
+    <div class="row-msg text-caption text-medium-emphasis">
+      {{ test.message || ' ' }}
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  taskKey: { type: String, required: true },
+  label:   { type: String, required: true },
+  test:    { type: Object, default: () => ({}) },
+})
+
+const status = computed(() => props.test.status || 'idle')
+const pct = computed(() => Math.round(props.test.progress || 0))
+
+const barColor = computed(() => ({
+  idle:      'grey-darken-2',
+  running:   'warning',
+  completed: 'success',
+  error:     'error',
+  stopped:   'orange',
+})[status.value] || 'grey-darken-2')
+
+const testIcon = computed(() => ({
+  ping_internet: 'mdi-earth',
+  ping_modem:    'mdi-router-wireless',
+  youtube:       'mdi-youtube',
+  iperf:         'mdi-speedometer',
+  torrent:       'mdi-download',
+  wifi_track:    'mdi-signal-variant',
+})[props.taskKey] || 'mdi-circle-medium')
+</script>
+
+<style scoped lang="scss">
+.test-row { display: flex; flex-direction: column; gap: 4px; }
+.row-line { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.row-name { font-weight: 600; }
+.row-pct  { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.row-msg  { min-height: 14px; }
+
+.bar-pulse :deep(.v-progress-linear__determinate) { animation: pulseBar 1.3s ease-in-out infinite; }
+@keyframes pulseBar { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+</style>

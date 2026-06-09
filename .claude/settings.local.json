@@ -11,7 +11,9 @@
       "Bash(echo \"EXIT=$?\")",
       "Bash(rm -f \"C:/Users/cpete/AppData/Local/Temp/fs_smoke_e2e.py\" \"C:/Users/cpete/AppData/Local/Temp/fs_smoke_cfg.json\")",
       "Bash(rm -rf logs/FS_*)",
-      "Bash(rm -rf common/__pycache__ common/runners/__pycache__ agent/__pycache__ server/__pycache__)"
+      "Bash(rm -rf common/__pycache__ common/runners/__pycache__ agent/__pycache__ server/__pycache__)",
+      "Bash(mv fullservice-automation *)",
+      "Bash(rm -rf fullservice-backend/dashboard)"
     ]
   }
 }

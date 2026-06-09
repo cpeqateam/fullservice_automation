@@ -34,7 +34,7 @@ VM'lerle uğraşmadan önce sistemin çalıştığını gör. Mac'te:
 
 ```bash
 brew install python iperf3
-cd <fullservice-automation klasörü>
+cd <fullservice-backend klasörü>
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
@@ -95,7 +95,7 @@ sudo apt install -y git python3-pip python3-venv iperf3
 git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation
 git checkout aliimran
-cd fullservice-automation
+cd fullservice-backend
 
 # Sanal ortam + bağımlılıklar (yeni Ubuntu için venv ŞART):
 python3 -m venv venv
@@ -106,6 +106,27 @@ pip install -r requirements.txt
 hostname -I
 ```
 Çıkan `192.168.x.x` adresini **not al** → buna **LINUX_IP** diyeceğiz. = 192.168.88.11
+
+## 1.55 Frontend'i derle (dashboard için — bir kez)
+
+Backend, kardeş `fullservice-frontend/dist/` klasörünü statik servis eder.
+Bu klasör build sonrası oluşur. Linux VM'de:
+
+```bash
+# Node.js + npm (bir kez):
+sudo apt install -y nodejs npm
+
+# fullservice-frontend dizini klasörde zaten var (repo'dan geldi)
+cd ../fullservice-frontend
+npm install
+npm run build
+cd ../fullservice-backend
+```
+
+`fullservice-frontend/dist/` oluşur; backend tekrar başlatılınca otomatik
+servis eder. Frontend kodunu değiştirip canlı görmek istersen `npm run dev`
+(http://localhost:5173) — backend yine 8770'te çalışır, Vite `/api/*`'yi
+proxy'ler.
 
 ## 1.6 config.json'da lan_ip'i ayarla
 ```bash
@@ -141,7 +162,7 @@ brew install python iperf3 git
 cd ~
 git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation && git checkout aliimran
-cd fullservice-automation
+cd fullservice-backend
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -192,7 +213,7 @@ UTM → `windows-wifi` → **Edit** → **Network → Bridged (Advanced)** → S
 ```powershell
 git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation; git checkout aliimran
-cd fullservice-automation
+cd fullservice-backend
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt

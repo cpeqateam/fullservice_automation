@@ -23,8 +23,15 @@ CONFIG_PATH = os.environ.get(
 LOGS_DIR = os.path.join(_BASE_DIR, "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-# Dashboard statik dosyaları (sunucu sunar)
-DASHBOARD_DIR = os.path.join(_BASE_DIR, "dashboard")
+# Dashboard statik dosyaları — Vue 3 + Vuetify build çıktısı (sunucu sunar).
+# Üretimde: kardeş klasör `fullservice-frontend/` içinde `npm run build` ile
+# üretilen `dist/`. Yerel olarak da `fullservice-backend/dashboard_dist/`
+# aranır (manuel bir build kopyalanmışsa). Bulunamazsa sunucu sadece API
+# döner (geliştirme sırasında Vite ayrı port'ta çalışır, /api'yi proxy'ler).
+_REPO_ROOT = os.path.dirname(_BASE_DIR)
+_FRONTEND_DIST = os.path.join(_REPO_ROOT, "fullservice-frontend", "dist")
+_LOCAL_DIST = os.path.join(_BASE_DIR, "dashboard_dist")
+DASHBOARD_DIR = _FRONTEND_DIST if os.path.isdir(_FRONTEND_DIST) else _LOCAL_DIST
 
 # Sertifikalar (FTP + DB için; Faz 5'te kullanılacak). Önce kök/certs, yoksa GRK'nınki.
 CERT_DIR = os.path.join(_BASE_DIR, "certs")
@@ -74,7 +81,7 @@ _FALLBACK = {
     "defaults": {
         "modem_ip": "192.168.1.1",
         "internet_ip": "8.8.8.8",
-        "youtube_link": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+        "youtube_link": "https://youtu.be/uXNU0XgGZhs",
         "iperf_port": 5201,
         "iperf_parallel": 4,
         "duration": 60,
