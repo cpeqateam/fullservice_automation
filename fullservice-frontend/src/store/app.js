@@ -11,15 +11,27 @@ import {
   healthCheck, getBrands, getVersions,
 } from '@/services/api'
 
-// Aşamalı health-check planı (kullanıcı isteri):
-//   1sn'de bir × 3 → 3sn × 3 → 5sn × 3 → 15sn × 1 → 30sn × 1 → sonra sürekli 60sn.
+// ─────────────────────────────────────────────────────────────────────────────
+// AŞAMALI HEALTH-CHECK PLANI (kullanıcı isteri)
+//
+// Mantık: Test başlamadan önce bağlantı en kritik andır; bu yüzden BAŞTA sık,
+// sonra giderek seyrek kontrol ederiz. Plan şu okunur:
+//   • interval = iki kontrol arasındaki bekleme (ms)
+//   • count    = bu aşamada KAÇ kez kontrol yapılacağı (Infinity = sonsuza dek)
+//
+//   1sn'de bir × 3  →  3sn × 3  →  5sn × 3  →  15sn × 1  →  30sn × 1  →  ∞·60sn
+//
+// Aşağıdaki startHealthCheck() bu tabloyu yukarıdan aşağı yürütür: bir aşamanın
+// 'count' kadar kontrolü bitince bir alt aşamaya geçer; son aşama Infinity
+// olduğu için program/sayfa kapanana kadar 60sn'de bir kontrole devam eder.
+// ─────────────────────────────────────────────────────────────────────────────
 const HC_SCHEDULE = [
-  { interval: 1000,  count: 3 },
-  { interval: 3000,  count: 3 },
-  { interval: 5000,  count: 3 },
-  { interval: 15000, count: 1 },
-  { interval: 30000, count: 1 },
-  { interval: 60000, count: Infinity },
+  { interval: 1000,  count: 3 },        // 0–2. sn: 1sn arayla 3 kontrol
+  { interval: 3000,  count: 3 },        // sonra 3sn arayla 3 kontrol
+  { interval: 5000,  count: 3 },        // sonra 5sn arayla 3 kontrol
+  { interval: 15000, count: 1 },        // sonra 1 kez 15sn sonra
+  { interval: 30000, count: 1 },        // sonra 1 kez 30sn sonra
+  { interval: 60000, count: Infinity }, // ardından sürekli 60sn'de bir
 ]
 
 export const useAppStore = defineStore('app', {
@@ -48,6 +60,7 @@ export const useAppStore = defineStore('app', {
 
     // Health-Check
     health: {
+      run:       false,  // en az bir kez başlatıldı mı? (test başlatmanın ön koşulu)
       running:   false,
       checkedAt: null,
       results:   {},   // { node_id: { reachable, latency_ms } }
@@ -130,6 +143,11 @@ export const useAppStore = defineStore('app', {
     },
 
     // ── Test başlat / durdur ─────────────────────────────────
+    // Health-check başlatılmadan test başlatılamaz (1. koşul).
+    requireHealthCheck() {
+      return this.health.run
+    },
+
     async startTest() {
       const body = {}
       const o = this.overrides
@@ -167,31 +185,41 @@ export const useAppStore = defineStore('app', {
       }
     },
 
-    // Buton bir kez basılınca: aşamalı plan boyunca ilerler, son aşamada
-    // sürekli 60sn'de bir devam eder (program/sayfa kapanana dek).
+    // Health-Check butonuna basılınca çağrılır. HC_SCHEDULE planını yürütür:
+    // her "tick" bir kontrol yapar, mevcut aşamanın 'count'u dolunca alt aşamaya
+    // geçer, son aşama Infinity olduğu için program/sayfa kapanana dek sürer.
+    //
+    // Neden setInterval değil de özyinelemeli setTimeout?
+    //   Çünkü aralık SABİT değil — aşamadan aşamaya değişiyor (1s→3s→5s→…).
+    //   setInterval tek bir sabit aralık verir; biz her kontrolden sonra bir
+    //   sonraki bekleme süresini yeniden hesaplayıp setTimeout ile zincirliyoruz.
     startHealthCheck() {
-      this.stopHealthCheck()   // tekrar basılırsa mükerrer timer engellenir
-      this.health.running = true
+      this.stopHealthCheck()       // tekrar basılırsa eski zamanlayıcıyı iptal et (mükerrer timer olmasın)
+      this.health.run     = true   // ön koşul sağlandı → artık test başlatılabilir
+      this.health.running = true   // zamanlayıcı aktif (UI butonu "çalışıyor" gösterir)
 
-      let stage = 0
-      let done  = 0   // mevcut aşamada yapılan kontrol sayısı
+      let stage = 0   // HC_SCHEDULE içindeki aşama indeksi (0'dan başlar)
+      let done  = 0   // bu aşamada şu ana kadar yapılan kontrol sayısı
 
+      // Tek bir kontrol turu + bir sonraki turu kendi kendine planlama:
       const tick = async () => {
-        await this._runHealthCheck()
-        if (!this.health.running) return
+        await this._runHealthCheck()        // 1) backend'e /api/health-check at, ışıkları güncelle
+        if (!this.health.running) return    // 2) bu sırada durdurulduysa zinciri kır
 
-        done += 1
+        done += 1                           // 3) bu aşamada bir kontrol daha tamamlandı
         const cur = HC_SCHEDULE[stage]
+        // 4) Aşamanın kotası doldu VE daha alt aşama varsa → bir alt aşamaya geç.
+        //    (Son aşamada count=Infinity olduğu için bu koşul asla sağlanmaz → sonsuz döngü.)
         if (done >= cur.count && stage < HC_SCHEDULE.length - 1) {
           stage += 1
           done = 0
         }
+        // 5) Bir sonraki kontrolü, (muhtemelen yeni) aşamanın aralığı kadar sonraya planla.
         const interval = HC_SCHEDULE[stage].interval
         this._hcTimer = setTimeout(tick, interval)
       }
 
-      // İlk kontrol hemen, sonra plana göre zincirle.
-      tick()
+      tick()   // İlk kontrol hemen yapılır; sonrası plana göre kendi kendine zincirlenir.
     },
 
     stopHealthCheck() {

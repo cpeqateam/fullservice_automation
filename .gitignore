@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+
+# Çalışma zamanı çıktıları
+logs/
+*.log
+
+# Sırlar (firmware DB / FTP sertifikaları — repoya asla konmaz)
+certs/
+
+# OS / editör
+.DS_Store
+
+# GRK referans projesi — yalnızca yerel örnek, repoya gitmez
+grk-automation/

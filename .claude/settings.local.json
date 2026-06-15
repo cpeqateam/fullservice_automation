@@ -19,7 +19,10 @@
       "Bash(python3 -)",
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "Bash(python3 -m py_compile fullservice-backend/server/main.py fullservice-backend/server/orchestrator.py fullservice-backend/common/firmware_db.py fullservice-backend/common/config.py)"
+      "Bash(python3 -m py_compile fullservice-backend/server/main.py fullservice-backend/server/orchestrator.py fullservice-backend/common/firmware_db.py fullservice-backend/common/config.py)",
+      "Bash(git check-ignore *)",
+      "Bash(grep -E \"__pycache__|\\\\.pyc$|/venv/|\\\\.DS_Store|/dist/|/logs/\")",
+      "Bash(git rm *)"
     ]
   }
 }

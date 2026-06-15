@@ -159,6 +159,14 @@ const starting = ref(false)
 const snack = reactive({ show: false, text: '', color: 'info' })
 
 async function onStart() {
+  // 1. koşul: önce sağ paneldeki Health-Check başlatılmış olmalı.
+  if (!appStore.requireHealthCheck()) {
+    snack.text = 'Önce sağ paneldeki Health-Check\'i başlatın; bağlantı kontrolleri çalışmalı.'
+    snack.color = 'warning'
+    snack.show = true
+    return
+  }
+
   starting.value = true
   try {
     const res = await appStore.startTest()

@@ -54,7 +54,6 @@ src/
 │   ├── Topbar.vue             # logo + başlık + oturum chip + tema toggle
 │   ├── DeviceForm.vue         # Marka/Model/Firmware + Süre + Başlat/Durdur (GRK Günlük Rutin sekmesi örnek)
 │   ├── StatusPanel.vue        # sağ panel: aşamalı Health-Check + kırmızı/yeşil ışıklar
-│   ├── ControlBar.vue         # (eski) — App.vue artık DeviceForm kullanır
 │   ├── NodeCard.vue           # tek düğüm kartı (4'lük gridin elemanı)
 │   └── TestRow.vue            # tek test ilerleme satırı
 └── assets/styles/main.scss    # global tipografi/scrollbar/tema overrideları

@@ -11,8 +11,8 @@
         </div>
       </div>
       <div class="head-right">
-        <span class="status-dot" :class="{ online: node.online }" :title="node.online ? 'online' : 'offline'"></span>
-        <span class="ml-2 text-caption">{{ node.online ? 'online' : 'offline' }}</span>
+        <span class="status-dot" :class="dotClass" :title="stateText"></span>
+        <span class="ml-2 text-caption">{{ stateText }}</span>
       </div>
     </div>
 
@@ -36,10 +36,26 @@
 <script setup>
 import { computed } from 'vue'
 import TestRow from '@/components/TestRow.vue'
+import { useAppStore } from '@/store/app'
 
 const props = defineProps({
   node:   { type: Object, required: true },
   labels: { type: Object, default: () => ({}) },
+})
+
+const appStore = useAppStore()
+
+// Online ışığı, sağ panelle AYNI health-check sonucundan beslenir (aynı periyotlar).
+// Health-check başlatılana kadar nötr (gri) durur — baştan online göstermez.
+const hc = computed(() => appStore.health.results[props.node.node_id])
+const dotClass = computed(() => {
+  if (!appStore.health.run || !hc.value) return ''            // nötr/gri
+  return hc.value.reachable ? 'online' : 'offline'
+})
+const stateText = computed(() => {
+  if (!appStore.health.run) return 'kontrol bekleniyor'
+  if (!hc.value) return appStore.health.running ? 'kontrol…' : '—'
+  return hc.value.reachable ? 'online' : 'offline'
 })
 
 const connIcon = computed(() => (props.node.conn === 'wifi' ? 'mdi-wifi' : props.node.conn === 'cable' ? 'mdi-ethernet' : 'mdi-server'))
@@ -69,6 +85,10 @@ const metaText = computed(() => {
 .status-dot.online {
   background: #30D158;
   box-shadow: 0 0 8px #30D158;
+}
+.status-dot.offline {
+  background: #FF453A;
+  box-shadow: 0 0 6px rgba(255,69,58,0.5);
 }
 
 .tests-wrap { display: flex; flex-direction: column; gap: 14px; }

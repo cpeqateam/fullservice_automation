@@ -22,12 +22,15 @@
 </template>
 
 <script setup>
+// Tek bir testin canlı ilerleme satırı: ad + ikon + yüzde + renkli bar + mesaj.
+// test objesi backend'den gelir ({ progress, status, message }); duruma göre
+// bar rengi ve (running'de) yanıp sönme efekti seçilir.
 import { computed } from 'vue'
 
 const props = defineProps({
-  taskKey: { type: String, required: true },
-  label:   { type: String, required: true },
-  test:    { type: Object, default: () => ({}) },
+  taskKey: { type: String, required: true },   // TestType anahtarı (ping_modem, iperf, ...)
+  label:   { type: String, required: true },   // insan-okunur etiket
+  test:    { type: Object, default: () => ({}) }, // { progress, status, message }
 })
 
 const status = computed(() => props.test.status || 'idle')

@@ -37,6 +37,8 @@
 </template>
 
 <script setup>
+// Üst bar: logo/başlık + oturum durumu chip'i (HAZIR/ÇALIŞIYOR/TAMAMLANDI) + tema toggle.
+// Durumu store.session'dan okur; mantık taşımaz, yalnızca gösterir.
 import { computed } from 'vue'
 import { useAppStore } from '@/store/app'
 const appStore = useAppStore()
