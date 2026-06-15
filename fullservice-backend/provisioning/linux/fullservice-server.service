@@ -1,0 +1,22 @@
+# FULL Servis sunucu (orkestrator + dashboard) — systemd unit.
+# install-server-systemd.sh __ tokenlerini doldurup /etc/systemd/system'e kopyalar:
+#   __PYTHON__  : python yolu (venv onerilir)
+#   __WORKDIR__ : fullservice-backend mutlak yolu
+#   __USER__    : servisi calistiracak kullanici
+[Unit]
+Description=FULL Servis Sunucu (orkestrator + dashboard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+ExecStart=__PYTHON__ __WORKDIR__/run_server.py
+Restart=always
+RestartSec=5
+StandardOutput=append:__WORKDIR__/logs/server-systemd.log
+StandardError=append:__WORKDIR__/logs/server-systemd.log
+
+[Install]
+WantedBy=multi-user.target

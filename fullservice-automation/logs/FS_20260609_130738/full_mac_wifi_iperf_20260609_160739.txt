@@ -1,0 +1,8 @@
+FULL Servis iperf3 — Node: mac_wifi
+Komut: iperf3 -c 192.168.1.10 -p 5201 -t 60 -P 4
+Baslangic: 2026-06-09 16:07:39.100079
+------------------------------
+iperf3: error - unable to connect to server - server may have stopped running or use a different port, firewall issue, etc.: Network is unreachable
+
+------------------------------
+Bitis: 2026-06-09 16:07:46.535408

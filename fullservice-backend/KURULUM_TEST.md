@@ -10,12 +10,17 @@ Hiç sanal makine kurmamış biri için ekran ekran yazılmıştır.
 16 GB RAM'e sığsın diye plan: **sadece 2 VM** (Linux + Windows). Mac'in kendisi
 iki "Mac düğümü"nü üstlenir (gerçek Mac olduğu için temsili doğru).
 
-| Düğüm | Nerede çalışır | RAM | Disk | Port |
+| Düğüm | Nerede çalışır | RAM | Disk | Port (listener) |
 |------|----------------|-----|------|------|
-| **Linux sunucu** (arayüzlü) | UTM'de **VM** | 4 GB | 25 GB | 8770 |
-| **mac_cable** | **Mac'in kendisi** (VM yok) | — | — | 8771 |
-| **mac_wifi** | **Mac'in kendisi** (VM yok) | — | — | 8772 |
-| **win_wifi** | UTM'de **VM** (Windows 11 ARM) | 5 GB | 64 GB | 8771 |
+| **Linux sunucu** (arayüzlü) | UTM'de **VM** | 4 GB | 25 GB | 8770 (HTTP/dashboard) |
+| **mac_cable** | **Mac'in kendisi** (VM yok) | — | — | **7531** |
+| **mac_wifi** | **Mac'in kendisi** (VM yok) | — | — | 7532 (host paylaşıldığı için ayrı) |
+| **win_wifi** | UTM'de **VM** (Windows 11 ARM) | 5 GB | 64 GB | **7531** |
+
+> 🔌 **Listener portu:** Agent'ın (listener) dinlediği varsayılan port artık
+> **7531** (`config.json:agent_port`). Fiziksel sahada her makine ayrı olduğu için
+> hepsi 7531 kullanabilir. Bu lab'da iki Mac düğümü **tek host'ta** koştuğu için
+> `mac_wifi`'ye `FS_AGENT_PORT=7532` ile ayrı port verilir.
 
 > ⚠️ 16 GB'da **3 VM'i (Linux+Windows+macOS) aynı anda açamazsın.** O yüzden iki Mac
 > düğümünü ayrı macOS VM'leri yerine doğrudan Mac host'ta çalıştırıyoruz. En sonda
@@ -40,13 +45,14 @@ pip install -r requirements.txt
 
 # 4 terminal aç (her terminalde önce: source venv/bin/activate):
 python run_server.py                                              # Terminal 1
-python run_agent.py mac_cable http://127.0.0.1:8770              # Terminal 2 (port 8771)
-FS_AGENT_PORT=8772 python run_agent.py mac_wifi http://127.0.0.1:8770   # Terminal 3
-FS_AGENT_PORT=8773 python run_agent.py win_wifi http://127.0.0.1:8770   # Terminal 4
+python run_agent.py mac_cable http://127.0.0.1:8770              # Terminal 2 (port 7531)
+FS_AGENT_PORT=7532 python run_agent.py mac_wifi http://127.0.0.1:8770   # Terminal 3
+FS_AGENT_PORT=7533 python run_agent.py win_wifi http://127.0.0.1:8770   # Terminal 4
 ```
 
-Tarayıcı: **http://127.0.0.1:8770** → **FULL Servis Başlat**. 4 kutu yeşil yanıyorsa
-sistem sağlam. Şimdi gerçek VM lab'a geçebilirsin.
+Tarayıcı: **http://127.0.0.1:8770**. Sağ paneldeki **Health-Check**'e bas → 4 düğüm
+yeşil yanmalı. Sol formdan Marka/Model/Firmware (DB yoksa serbest metin) + Süre seç
+→ **FULL Servis Başlat**. Test ilerlemeleri canlı akıyorsa sistem sağlam.
 
 ---
 
@@ -171,10 +177,10 @@ pip install -r requirements.txt
 İki ayrı terminal aç, **her ikisinde önce** `cd ...fullservice-automation && source venv/bin/activate`:
 ```bash
 # Terminal A:
-python run_agent.py mac_cable http://LINUX_IP:8770          # port 8771 = 192.168.88.11
+python run_agent.py mac_cable http://LINUX_IP:8770          # port 7531
 
 # Terminal B:
-FS_AGENT_PORT=8772 python run_agent.py mac_wifi http://LINUX_IP:8770
+FS_AGENT_PORT=7532 python run_agent.py mac_wifi http://LINUX_IP:8770
 ```
 Açılınca panelde mac_cable ve mac_wifi yeşil yanar.
 
@@ -219,7 +225,7 @@ venv\Scripts\activate
 pip install -r requirements.txt
 python run_agent.py win_wifi http://LINUX_IP:8770
 ```
-(Windows tek agent çalıştırdığı için port 8771 varsayılanı yeterli, env gerekmez.)
+(Windows tek agent çalıştırdığı için port **7531** varsayılanı yeterli, env gerekmez.)
 
 ---
 
@@ -232,11 +238,68 @@ Panelde 4 düğüm yeşil yanıp testler eşzamanlı koşmalı. ✅
 
 ---
 
+# BÖLÜM 5 — Statik IP + Listener'ı boot'ta başlatma (saha kurulumu)
+
+VM lab'da sistemin çalıştığını gördükten sonra, **fiziksel** saha kurulumunda
+her makineye sabit yerel IP atanır ve listener (agent) makine açılır açılmaz
+otomatik kalkar. Tüm script'ler [`provisioning/`](provisioning/README.md)
+altında ve değerleri `config.json`'un **`network`** bölümünden okur.
+
+### 5.1 IP planını gir
+`config.json` → `network.assignments` altında her düğümün `ip` ve `interface`
+değerini kendi LAN'ına göre düzenle (`gateway`, `subnet_mask`, `dns` ortak).
+
+### 5.2 Statik IP ata
+```bash
+# macOS (mac_cable / mac_wifi):
+sudo provisioning/macos/set-static-ip.sh mac_cable
+
+# Windows (Yönetici PowerShell):
+.\provisioning\windows\set-static-ip.ps1 -NodeId win_wifi
+
+# Linux sunucu:
+sudo provisioning/linux/set-static-ip.sh server
+```
+
+### 5.3 Listener'ı boot'ta başlat
+```bash
+# macOS (launchd):
+provisioning/macos/install-agent-launchd.sh mac_cable http://192.168.1.10:8770 7531
+
+# Windows (Görev Zamanlayıcı, Yönetici PS):
+.\provisioning\windows\install-agent-task.ps1 -NodeId win_wifi -ServerUrl http://192.168.1.10:8770 -Port 7531
+
+# Linux sunucu (systemd):
+sudo provisioning/linux/install-server-systemd.sh
+```
+
+Makineyi yeniden başlat → dashboard'da düğüm online, sağ paneldeki **Health-Check**
+ona yeşil yakmalı. Detaylar: [`provisioning/README.md`](provisioning/README.md).
+
+> **Listener vs. executer:** Listener = boot'ta açılan agent (port 7531). Sunucudaki
+> arayüzde **Başlat**'a basınca sunucu, online agent'lara komut gönderir; agent o
+> komutla kendi **executer**'larını (ping/youtube/iperf/torrent/wifi runner'ları)
+> ayağa kaldırır. Yani ayrı bir "executer servisi" kurmana gerek yok.
+
+---
+
+# Firmware DB (Marka / Model / Firmware combobox'ları)
+
+Sol formdaki Marka/Model/Firmware listeleri, GRK ile **aynı** PostgreSQL'den
+(`cpeqadb`, `grk_firmware` tablosu) SSL ile çekilir. Bunun için sunucuda
+`fullservice-backend/certs/` altında `ca.crt`, `client.crt`, `client.key`
+bulunmalıdır (repoya konulmaz). Sertifika/bağlantı yoksa sistem **çökmez**:
+alanlar otomatik olarak **serbest metin** girişine düşer ve test yine başlatılır.
+
+---
+
 ## Sorun giderme
 - **`pip: command not found`** → `sudo apt install -y python3-pip python3-venv`, sonra venv kullan.
 - **`externally-managed-environment` hatası** → sistem geneline pip yasak; mutlaka `python3 -m venv venv && source venv/bin/activate` içinden kur.
 - **Panelde düğüm gri/offline** → o agent'ın terminali açık mı? IP doğru mu? Ağ **Bridged** mi? Mac↔Linux birbirini görüyor mu (`ping LINUX_IP`)?
-- **İki Mac agent'ı çakışıyor** → ikisine farklı port ver (`FS_AGENT_PORT=8772 ...`).
+- **İki Mac agent'ı çakışıyor** → ikisine farklı port ver (`FS_AGENT_PORT=7532 ...`).
+- **Health-Check ışığı kırmızı** → o düğümün listener'ı (port 7531) çalışıyor mu, IP doğru mu? `curl http://<ip>:7531/health` ile dene.
+- **Marka/Model boş / serbest metin** → firmware DB'ye (certs) ulaşılamıyor; saha kurulumunda `certs/` ekle. Bu beklenen bir geri-düşüş davranışıdır.
 - **`iperf` kutusu kırmızı** → o makinede iperf3 yok (mac: `brew install iperf3`, linux: `sudo apt install iperf3`).
 - **`youtube` tarayıcı açıyor** → normal; istemezsen `config.json`'da `youtube_link`'i boş bırak.
 - **`git checkout aliimran` "branch yok" derse** → `git fetch origin` sonra tekrar dene.

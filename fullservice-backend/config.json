@@ -7,7 +7,20 @@
     "lan_ip": "192.168.1.10"
   },
 
-  "agent_port": 8771,
+  "agent_port": 7531,
+
+  "network": {
+    "_aciklama": "Yerel statik IP plani. provisioning/ altindaki scriptler bu bolumu okur. IP'leri kendi laboratuvarinizdaki LAN semasina gore guncelleyin.",
+    "subnet_mask": "255.255.255.0",
+    "gateway": "192.168.1.1",
+    "dns": ["8.8.8.8", "8.8.4.4"],
+    "assignments": {
+      "server":    { "ip": "192.168.1.10", "interface": "eth0" },
+      "mac_cable": { "ip": "192.168.1.11", "interface": "Ethernet" },
+      "win_wifi":  { "ip": "192.168.1.13", "interface": "Wi-Fi" },
+      "mac_wifi":  { "ip": "192.168.1.14", "interface": "Wi-Fi" }
+    }
+  },
 
   "defaults": {
     "modem_ip": "192.168.1.1",

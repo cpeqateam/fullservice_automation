@@ -5,8 +5,11 @@ pydantic
 requests
 python-multipart
 
-# Faz 5 (FTP + DB + Excel) için GRK'dan gelecek ek bağımlılıklar:
-# sqlalchemy
-# psycopg2-binary
+# Marka/Model/Firmware combobox'ları için firmware DB (cpeqadb, PostgreSQL/SSL).
+# Bağlantı kurulamazsa sistem yine çalışır; alanlar serbest-metin girişine düşer.
+sqlalchemy
+psycopg2-binary
+
+# Faz 5 (FTP + Excel) için GRK'dan gelecek ek bağımlılıklar:
 # openpyxl
 # xlsxwriter

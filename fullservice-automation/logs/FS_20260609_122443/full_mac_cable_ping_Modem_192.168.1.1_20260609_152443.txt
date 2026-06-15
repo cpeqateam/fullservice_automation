@@ -1,0 +1,310 @@
+FULL Servis Ping — Modem
+Node: mac_cable  Hedef: 192.168.1.1
+Baslangic: 2026-06-09 15:24:43.723561
+------------------------------
+PING 192.168.1.1 (192.168.1.1): 56 data bytes
+Request timeout for icmp_seq 0
+Request timeout for icmp_seq 1
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 69ee   0 0000  3f  01 3755 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 69c3   0 0000  3f  01 3780 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 f1f5   0 0000  3f  01 af4d 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 2
+Request timeout for icmp_seq 3
+Request timeout for icmp_seq 4
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 e13d   0 0000  3f  01 c005 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 c7b5   0 0000  3f  01 d98d 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 3b18   0 0000  3f  01 662b 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 5
+Request timeout for icmp_seq 6
+Request timeout for icmp_seq 7
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 2f7f   0 0000  3f  01 71c4 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 1157   0 0000  3f  01 8fec 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 7b76   0 0000  3f  01 25cd 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 8
+Request timeout for icmp_seq 9
+Request timeout for icmp_seq 10
+Request timeout for icmp_seq 11
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 350b   0 0000  3f  01 6c38 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 df17   0 0000  3f  01 c22b 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 78b2   0 0000  3f  01 2891 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 8ddb   0 0000  3f  01 1368 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 12
+Request timeout for icmp_seq 13
+Request timeout for icmp_seq 14
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 5b68   0 0000  3f  01 45db 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 3952   0 0000  3f  01 67f1 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 1e94   0 0000  3f  01 82af 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 15
+Request timeout for icmp_seq 16
+Request timeout for icmp_seq 17
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 5b32   0 0000  3f  01 4611 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 56c5   0 0000  3f  01 4a7e 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 83b8   0 0000  3f  01 1d8b 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 18
+Request timeout for icmp_seq 19
+Request timeout for icmp_seq 20
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 b502   0 0000  3f  01 ec40 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 0c7c   0 0000  3f  01 94c7 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 545e   0 0000  3f  01 4ce5 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 21
+Request timeout for icmp_seq 22
+Request timeout for icmp_seq 23
+Request timeout for icmp_seq 24
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 f542   0 0000  3f  01 ac00 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 7d7c   0 0000  3f  01 23c7 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 53df   0 0000  3f  01 4d64 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 dc18   0 0000  3f  01 c52a 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 25
+Request timeout for icmp_seq 26
+Request timeout for icmp_seq 27
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 8cbb   0 0000  3f  01 1488 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 a0eb   0 0000  3f  01 0058 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 0f3e   0 0000  3f  01 9205 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 28
+Request timeout for icmp_seq 29
+Request timeout for icmp_seq 30
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 7eca   0 0000  3f  01 2279 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 f8a7   0 0000  3f  01 a89b 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 6646   0 0000  3f  01 3afd 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 31
+Request timeout for icmp_seq 32
+Request timeout for icmp_seq 33
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 fce9   0 0000  3f  01 a459 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 3ba0   0 0000  3f  01 65a3 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 59ac   0 0000  3f  01 4797 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 34
+Request timeout for icmp_seq 35
+Request timeout for icmp_seq 36
+Request timeout for icmp_seq 37
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 7c4b   0 0000  3f  01 24f8 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 3c64   0 0000  3f  01 64df 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 655c   0 0000  3f  01 3be7 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 a7c1   0 0000  3f  01 f981 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 38
+Request timeout for icmp_seq 39
+Request timeout for icmp_seq 40
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 a232   0 0000  3f  01 ff10 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 bf62   0 0000  3f  01 e1e0 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 efde   0 0000  3f  01 b164 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 41
+Request timeout for icmp_seq 42
+Request timeout for icmp_seq 43
+Request timeout for icmp_seq 44
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 87f4   0 0000  3f  01 194f 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 60e7   0 0000  3f  01 405c 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 c6de   0 0000  3f  01 da64 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 3479   0 0000  3f  01 6cca 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 45
+Request timeout for icmp_seq 46
+Request timeout for icmp_seq 47
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 0884   0 0000  3f  01 98bf 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 0a21   0 0000  3f  01 9722 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 a55e   0 0000  3f  01 fbe4 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 48
+Request timeout for icmp_seq 49
+Request timeout for icmp_seq 50
+Request timeout for icmp_seq 51
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 06d5   0 0000  3f  01 9a6e 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 31ce   0 0000  3f  01 6f75 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 e3af   0 0000  3f  01 bd93 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 e3a5   0 0000  3f  01 bd9d 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 52
+Request timeout for icmp_seq 53
+Request timeout for icmp_seq 54
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 d1f6   0 0000  3f  01 cf4c 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 42a4   0 0000  3f  01 5e9f 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 4bda   0 0000  3f  01 5569 192.168.88.20  192.168.1.1 
+
+Request timeout for icmp_seq 55
+Request timeout for icmp_seq 56
+Request timeout for icmp_seq 57
+Request timeout for icmp_seq 58
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 51f7   0 0000  3f  01 4f4c 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 082a   0 0000  3f  01 9919 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 b263   0 0000  3f  01 eedf 192.168.88.20  192.168.1.1 
+
+92 bytes from 192.168.2.4: Destination Host Unreachable
+Vr HL TOS  Len   ID Flg  off TTL Pro  cks      Src      Dst
+ 4  5  00 5400 0f70   0 0000  3f  01 91d3 192.168.88.20  192.168.1.1 
+
+
+--- 192.168.1.1 ping statistics ---
+60 packets transmitted, 0 packets received, 100.0% packet loss
+
+------------------------------
+Bitis: 2026-06-09 15:25:44.305175

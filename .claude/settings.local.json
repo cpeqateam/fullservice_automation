@@ -13,7 +13,13 @@
       "Bash(rm -rf logs/FS_*)",
       "Bash(rm -rf common/__pycache__ common/runners/__pycache__ agent/__pycache__ server/__pycache__)",
       "Bash(mv fullservice-automation *)",
-      "Bash(rm -rf fullservice-backend/dashboard)"
+      "Bash(rm -rf fullservice-backend/dashboard)",
+      "Read(//Users/aliimranatabey/vscode-workspace/**)",
+      "Bash(chmod +x macos/set-static-ip.sh macos/install-agent-launchd.sh linux/set-static-ip.sh linux/install-server-systemd.sh)",
+      "Bash(python3 -)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(python3 -m py_compile fullservice-backend/server/main.py fullservice-backend/server/orchestrator.py fullservice-backend/common/firmware_db.py fullservice-backend/common/config.py)"
     ]
   }
 }

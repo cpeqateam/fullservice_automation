@@ -47,25 +47,28 @@ src/
 ├── plugins/vuetify.js         # tema (TT magenta + secondary mavi)
 ├── store/
 │   ├── index.js               # Pinia örneği
-│   └── app.js                 # nodes/session/params + polling + actions
-├── services/api.js            # axios + fetchState/startSession/stopSession
+│   └── app.js                 # nodes/session/deviceInfo + polling + firmware + health-check
+├── services/api.js            # axios + state/session + firmware + health-check
 ├── components/
 │   ├── LiquidBackground.vue   # animasyonlu renk lekeleri (arkaplan)
 │   ├── Topbar.vue             # logo + başlık + oturum chip + tema toggle
-│   ├── ControlBar.vue         # parametre inputları + Başlat/Durdur
+│   ├── DeviceForm.vue         # Marka/Model/Firmware + Süre + Başlat/Durdur (GRK Günlük Rutin sekmesi örnek)
+│   ├── StatusPanel.vue        # sağ panel: aşamalı Health-Check + kırmızı/yeşil ışıklar
+│   ├── ControlBar.vue         # (eski) — App.vue artık DeviceForm kullanır
 │   ├── NodeCard.vue           # tek düğüm kartı (4'lük gridin elemanı)
 │   └── TestRow.vue            # tek test ilerleme satırı
 └── assets/styles/main.scss    # global tipografi/scrollbar/tema overrideları
 ```
 
 ## Backend ile sözleşme
-Yalnız üç endpoint kullanılır:
 
-| Method | URL                   | Kullanım                          |
-|--------|-----------------------|-----------------------------------|
-| GET    | `/api/state`          | 1 sn polling — birleşik durum     |
-| POST   | `/api/session/start`  | Başlat (opsiyonel override)       |
-| POST   | `/api/session/stop`   | Durdur                            |
+| Method | URL                                   | Kullanım                          |
+|--------|---------------------------------------|-----------------------------------|
+| GET    | `/api/state`                          | 1 sn polling — birleşik durum     |
+| POST   | `/api/session/start`                  | Başlat (override + brand/model/firmware) |
+| POST   | `/api/session/stop`                   | Durdur                            |
+| GET    | `/api/health-check`                   | Aşamalı bağlantı kontrolü (ışıklar)|
+| GET    | `/api/firmware/brands` · `/models/{b}` · `/versions/{b}/{m}` | combobox kaynağı (yoksa serbest metin) |
 
 `fullservice-backend/server/main.py`'deki FastAPI router'ı tüm `/api/...` rotalarını
 sağlar. Detay için repo kökündeki `MIMARI.md`.

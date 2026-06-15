@@ -6,16 +6,26 @@
 
     <v-main>
       <v-container fluid class="py-6">
-        <ControlBar />
+        <v-row>
+          <!-- Ana içerik: cihaz formu + canlı test izleme -->
+          <v-col cols="12" lg="9">
+            <DeviceForm class="mb-5" />
 
-        <div v-if="!appStore.nodes.length" class="empty">
-          <v-progress-circular indeterminate color="primary" size="48" />
-          <p class="mt-4 text-body-2 text-medium-emphasis">Sunucuya bağlanılıyor…</p>
-        </div>
+            <div v-if="!appStore.nodes.length" class="empty">
+              <v-progress-circular indeterminate color="primary" size="48" />
+              <p class="mt-4 text-body-2 text-medium-emphasis">Sunucuya bağlanılıyor…</p>
+            </div>
 
-        <div v-else class="node-grid">
-          <NodeCard v-for="n in appStore.nodes" :key="n.node_id" :node="n" :labels="appStore.testLabels" />
-        </div>
+            <div v-else class="node-grid">
+              <NodeCard v-for="n in appStore.nodes" :key="n.node_id" :node="n" :labels="appStore.testLabels" />
+            </div>
+          </v-col>
+
+          <!-- Sağ panel: health-check + bağlantı ışıkları -->
+          <v-col cols="12" lg="3">
+            <StatusPanel />
+          </v-col>
+        </v-row>
       </v-container>
     </v-main>
 
@@ -33,13 +43,20 @@ import { onMounted, onBeforeUnmount } from 'vue'
 import { useAppStore } from '@/store/app'
 import LiquidBackground from '@/components/LiquidBackground.vue'
 import Topbar from '@/components/Topbar.vue'
-import ControlBar from '@/components/ControlBar.vue'
+import DeviceForm from '@/components/DeviceForm.vue'
+import StatusPanel from '@/components/StatusPanel.vue'
 import NodeCard from '@/components/NodeCard.vue'
 
 const appStore = useAppStore()
 
-onMounted(() => appStore.startPolling(1000))
-onBeforeUnmount(() => appStore.stopPolling())
+onMounted(() => {
+  appStore.startPolling(1000)
+  appStore.loadBrands()
+})
+onBeforeUnmount(() => {
+  appStore.stopPolling()
+  appStore.stopHealthCheck()
+})
 </script>
 
 <style>
@@ -47,9 +64,8 @@ onBeforeUnmount(() => appStore.stopPolling())
 .empty { display: flex; flex-direction: column; align-items: center; padding: 80px 0; }
 .node-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 18px;
-  margin-top: 18px;
 }
 .foot {
   background: rgba(0,0,0,0.3) !important;

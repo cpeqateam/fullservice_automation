@@ -51,7 +51,8 @@ class Orchestrator:
             }
 
         self.session = {"session_id": None, "running": False,
-                        "started_at": None, "ended_at": None, "params": {}}
+                        "started_at": None, "ended_at": None, "params": {},
+                        "device": {"brand": None, "model": None, "firmware": None}}
 
         # Sunucu-yerel testler için durdurma bayrağı + thread'ler
         self._server_stop = threading.Event()
@@ -148,6 +149,11 @@ class Orchestrator:
                 "started_at": datetime.now().isoformat(timespec="seconds"),
                 "ended_at": None,
                 "params": params.dict() if hasattr(params, "dict") else params.model_dump(),
+                "device": {
+                    "brand":    overrides.get("brand"),
+                    "model":    overrides.get("model"),
+                    "firmware": overrides.get("firmware"),
+                },
             }
             # Tüm test durumlarını sıfırla
             for node in self.nodes.values():
@@ -250,3 +256,48 @@ class Orchestrator:
                 except Exception:
                     pass
         return {"status": "stopped"}
+
+    # ── Aktif bağlantı kontrolü (health-check) ───────────────
+    def health_check(self) -> dict:
+        """
+        Her düğümün sunucuya/listener'a anlık erişilebilirliğini AKTİF olarak ölçer.
+        Heartbeat tabanlı `online`dan bağımsızdır: dashboard'daki "Health-Check"
+        butonu bunu aşamalı aralıklarla çağırır (kırmızı/yeşil ışıklar).
+
+        Sunucu düğümü daima reachable (yerel). Diğer düğümler için son bilinen
+        ip:agent_port'a paralel GET /health atılır.
+        """
+        with self._lock:
+            nodes = [self._node_view(n) for n in self.nodes.values()]
+
+        results: dict[str, dict] = {}
+        threads: list[threading.Thread] = []
+
+        def _probe(nv):
+            if nv["is_server"]:
+                results[nv["node_id"]] = {"reachable": True, "latency_ms": 0}
+                return
+            ip, port = nv.get("ip"), nv.get("agent_port")
+            if not ip or not port:
+                results[nv["node_id"]] = {"reachable": False, "latency_ms": None}
+                return
+            t0 = datetime.now()
+            try:
+                r = requests.get(f"http://{ip}:{port}/health", timeout=1.5)
+                ok = r.status_code == 200
+            except Exception:
+                ok = False
+            latency = int((datetime.now() - t0).total_seconds() * 1000) if ok else None
+            results[nv["node_id"]] = {"reachable": ok, "latency_ms": latency}
+
+        for nv in nodes:
+            th = threading.Thread(target=_probe, args=(nv,), daemon=True)
+            th.start()
+            threads.append(th)
+        for th in threads:
+            th.join(timeout=2)
+
+        return {
+            "checked_at": datetime.now().isoformat(timespec="seconds"),
+            "results": results,
+        }

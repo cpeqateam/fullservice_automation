@@ -1,0 +1,12 @@
+FULL Servis Ping — Internet
+Node: mac_wifi  Hedef: 8.8.8.8
+Baslangic: 2026-06-09 16:07:39.089228
+------------------------------
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+
+--- 8.8.8.8 ping statistics ---
+60 packets transmitted, 60 packets received, 0.0% packet loss, 60 packets out of wait time
+round-trip min/avg/max/stddev = 14.023/27.426/107.496/24.438 ms
+
+------------------------------
+Bitis: 2026-06-09 16:08:39.073398

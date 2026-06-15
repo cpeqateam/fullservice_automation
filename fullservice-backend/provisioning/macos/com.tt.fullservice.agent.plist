@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FULL Servis agent (listener) — macOS launchd tanimi.
+  install-agent-launchd.sh bu sablonu kopyalayip __ tokenlerini doldurur:
+    __PYTHON__    : python3 yolu (or. /usr/bin/python3 veya venv python)
+    __WORKDIR__   : fullservice-backend mutlak yolu
+    __NODE_ID__   : mac_cable | mac_wifi
+    __SERVER_URL__: http://<sunucu_lan_ip>:8770
+    __PORT__      : listener portu (varsayilan 7531)
+  RunAtLoad + KeepAlive → makine acilir acilmaz baslar, cokerse yeniden kalkar.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tt.fullservice.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PYTHON__</string>
+        <string>__WORKDIR__/run_agent.py</string>
+        <string>__NODE_ID__</string>
+        <string>__SERVER_URL__</string>
+        <string>__PORT__</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WORKDIR__</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__WORKDIR__/logs/agent-launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__WORKDIR__/logs/agent-launchd.err.log</string>
+</dict>
+</plist>

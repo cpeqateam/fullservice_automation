@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 from common.config import load_config, DASHBOARD_DIR
 from common.protocol import RegisterRequest, ProgressUpdate
+from common import firmware_db
 from server.orchestrator import Orchestrator
 from server import log_collector
 
@@ -56,6 +57,10 @@ class SessionStartRequest(BaseModel):
     internet_ip: Optional[str] = None
     youtube_link: Optional[str] = None
     duration: Optional[int] = None
+    # Cihaz bilgisi (Günlük Rutin Kontrol formundan) — log/dashboard için
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    firmware: Optional[str] = None
 
 
 @app.get("/health")
@@ -97,6 +102,39 @@ def session_start(req: SessionStartRequest):
 @app.post("/api/session/stop")
 def session_stop():
     return orch.stop_session()
+
+
+# ── Health-Check (aktif bağlantı kontrolü) ──────────────────
+@app.get("/api/health-check")
+def health_check():
+    """Tüm düğümlerin sunucuya/listener'a anlık erişilebilirliği (kırmızı/yeşil)."""
+    return orch.health_check()
+
+
+# ── Firmware DB (Marka / Model / Firmware combobox'ları) ─────
+# DB erişilemezse 503 döner; frontend bunu serbest-metin girişine düşmek için kullanır.
+@app.get("/api/firmware/brands")
+def firmware_brands():
+    try:
+        return firmware_db.get_brands()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+
+
+@app.get("/api/firmware/models/{brand}")
+def firmware_models(brand: str):
+    try:
+        return firmware_db.get_models(brand)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+
+
+@app.get("/api/firmware/versions/{brand}/{model}")
+def firmware_versions(brand: str, model: str):
+    try:
+        return firmware_db.get_versions(brand, model)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
 
 
 # ── Dashboard (statik) ───────────────────────────────────────

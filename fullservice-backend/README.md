@@ -20,7 +20,7 @@ Frontend (Vue 3 + Vuetify 3): kardeş klasör [`../fullservice-frontend/`](../fu
         └──┬──────────────┬──────────────┬────────────┘
    HTTP    │              │              │
         ┌──▼─┐         ┌──▼─┐         ┌──▼─┐
-        │MAC │         │WIN │         │MAC │   agent (FastAPI :8771+)
+        │MAC │         │WIN │         │MAC │   listener=agent (FastAPI :7531)
         │kbl │         │WiFi│         │WiFi│
         └────┘         └────┘         └────┘
 ```
@@ -79,7 +79,10 @@ pip install -r requirements.txt
 ```json
 {
   "server":   { "host": "0.0.0.0", "port": 8770, "lan_ip": "192.168.x.x" },
-  "agent_port": 8771,
+  "agent_port": 7531,
+  "network":  { "subnet_mask": "255.255.255.0", "gateway": "192.168.1.1",
+                "dns": ["8.8.8.8"],
+                "assignments": { "server": {"ip":"192.168.1.10","interface":"eth0"}, "...": {} } },
   "defaults": { "modem_ip": "192.168.1.1", "internet_ip": "8.8.8.8",
                 "youtube_link": "...", "iperf_port": 5201, "iperf_parallel": 4,
                 "duration": 60 },
@@ -100,15 +103,19 @@ python run_server.py
 
 ### 3. Agent (her client)
 ```bash
-# Mac (kablo)
+# Mac (kablo) — listener varsayılan port 7531
 python run_agent.py mac_cable http://<lan_ip>:8770
 
 # Mac (Wi-Fi) — aynı host'ta 2. agent için farklı port
-FS_AGENT_PORT=8772 python run_agent.py mac_wifi http://<lan_ip>:8770
+FS_AGENT_PORT=7532 python run_agent.py mac_wifi http://<lan_ip>:8770
 
 # Windows (Wi-Fi)
 python run_agent.py win_wifi http://<lan_ip>:8770
 ```
+
+> **Listener = agent.** Boot'ta otomatik kalkması ve makinelere statik IP atanması
+> için [`provisioning/`](provisioning/README.md) altındaki script'leri kullan
+> (macOS launchd · Windows Görev Zamanlayıcı · Linux systemd).
 
 Agent açılışta sunucuya kayıt olur, 10 sn'de bir heartbeat gönderir. Sunucu
 "FULL Servis Başlat" komutu verince ataması olan testleri yerelde paralel
@@ -123,8 +130,12 @@ log dosyasını sunucuya HTTP upload eder.
 | POST   | `/progress`         | Agent → sunucu ilerleme bildirimi                     |
 | POST   | `/logs/upload`      | Agent → sunucu log dosyası yükleme (multipart)        |
 | GET    | `/state`            | Birleşik durum (dashboard 1 sn polling)               |
-| POST   | `/session/start`    | Testi başlat (opsiyonel override gövde)               |
+| POST   | `/session/start`    | Testi başlat (override + brand/model/firmware gövde)  |
 | POST   | `/session/stop`     | Testi durdur                                          |
+| GET    | `/health-check`     | Tüm düğümlerin anlık erişilebilirliği (kırmızı/yeşil) |
+| GET    | `/firmware/brands`  | DB'den marka listesi (yoksa 503 → serbest metin)      |
+| GET    | `/firmware/models/{brand}`          | DB'den model listesi                  |
+| GET    | `/firmware/versions/{brand}/{model}`| DB'den firmware sürümleri             |
 | GET    | `/health`           | Sağlık kontrolü                                       |
 
 ## Şu anki durum (Faz 1–3)
@@ -136,14 +147,20 @@ log dosyasını sunucuya HTTP upload eder.
 | ping (internet/modem), youtube | ✅ gerçek |
 | iperf3 (Linux server + Mac client) | ✅ gerçek |
 | torrent, wifi_track | 🟡 simülasyon (Faz 4: gerçek) |
+| Marka/Model/Firmware combobox (cpeqadb, GRK ile aynı; yoksa serbest metin) | ✅ gerçek |
+| Aşamalı Health-Check paneli (kırmızı/yeşil ışıklar) | ✅ gerçek |
+| Statik IP + boot listener paketleme (`provisioning/`) | ✅ gerçek (launchd/Task Scheduler/systemd) |
 | Log → FTPS + PostgreSQL + bildirim | ⏳ Faz 5 |
-| Cross-platform paketleme (kurulum kolaylığı) | ⏳ Faz 6 |
 
 ## Yol haritası
 
 - **Faz 4:** torrent (qBittorrent Web API), wifi_track (platforma özgü WLAN okuma + Excel); 2 Mac iperf için çoklu port.
 - **Faz 5:** oturum bitince `logs/<session>/` → FTPS + PostgreSQL (SSL) + mail/Telegram. Sertifika ve kimlik bilgileri ortam değişkeniyle taşınır (kod içinde değil).
-- **Faz 6:** her makinede systemd / Windows service / launchd ile agent'ı kalıcı çalıştırma.
+- **Faz 6 (kısmen tamam):** statik IP + boot autostart paketlemesi `provisioning/` altında geldi (launchd/Task Scheduler/systemd). Kalan: tek-tıklık installer.
+
+> **Firmware DB:** Marka/Model/Firmware combobox'ları GRK ile aynı `cpeqadb`'den
+> okunur (`grk_firmware`, SSL). Sertifikalar `fullservice-backend/certs/` altında
+> aranır (repoda yok). Bağlantı yoksa alanlar serbest-metin'e düşer, sistem çalışmaya devam eder.
 
 ## Güvenlik notu
 Bu repoda **hiçbir** üretim kimlik bilgisi (DB şifresi, FTP parolası, sertifika,

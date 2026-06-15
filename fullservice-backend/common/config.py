@@ -77,7 +77,18 @@ def detect_lan_ip() -> str:
 # config.json hiç yoksa diye gömülü yedek (config.json ile aynı olmalı)
 _FALLBACK = {
     "server": {"host": "0.0.0.0", "port": 8770, "lan_ip": detect_lan_ip()},
-    "agent_port": 8771,
+    "agent_port": 7531,
+    "network": {
+        "subnet_mask": "255.255.255.0",
+        "gateway": "192.168.1.1",
+        "dns": ["8.8.8.8", "8.8.4.4"],
+        "assignments": {
+            "server":    {"ip": "192.168.1.10", "interface": "eth0"},
+            "mac_cable": {"ip": "192.168.1.11", "interface": "Ethernet"},
+            "win_wifi":  {"ip": "192.168.1.13", "interface": "Wi-Fi"},
+            "mac_wifi":  {"ip": "192.168.1.14", "interface": "Wi-Fi"},
+        },
+    },
     "defaults": {
         "modem_ip": "192.168.1.1",
         "internet_ip": "8.8.8.8",
