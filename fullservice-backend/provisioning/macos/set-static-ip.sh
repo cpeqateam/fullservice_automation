@@ -30,8 +30,8 @@ print(a["interface"]); print(a["ip"]); print(net["subnet_mask"]); print(net["gat
 PY
 }
 
-mapfile -t CFG < <(read_cfg)
-IFACE="${CFG[0]}"; IP="${CFG[1]}"; MASK="${CFG[2]}"; GW="${CFG[3]}"; DNS="${CFG[4]}"
+# Not: macOS varsayilan bash 3.2 'mapfile/readarray' icermez → satir satir oku (tasinabilir).
+{ read -r IFACE; read -r IP; read -r MASK; read -r GW; read -r DNS; } < <(read_cfg)
 
 echo "[macOS] $NODE_ID → servis='$IFACE' ip=$IP mask=$MASK gw=$GW dns=($DNS)"
 networksetup -setmanual "$IFACE" "$IP" "$MASK" "$GW"
