@@ -22,7 +22,15 @@
       "Bash(python3 -m py_compile fullservice-backend/server/main.py fullservice-backend/server/orchestrator.py fullservice-backend/common/firmware_db.py fullservice-backend/common/config.py)",
       "Bash(git check-ignore *)",
       "Bash(grep -E \"__pycache__|\\\\.pyc$|/venv/|\\\\.DS_Store|/dist/|/logs/\")",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(ls -la certs)",
+      "Read(//c/Users/cpete/OneDrive/Masaüstü/SCRIPTS/antigravity/fullservice-frontend/**)",
+      "Bash(cd \"c:/Users/cpete/OneDrive/Masaüstü/SCRIPTS/antigravity\" && ls -la && echo \"---grk certs---\" && find grk-automation -maxdepth 2 -iname \"*.crt\" -o -iname \"*.key\" 2>/dev/null | head -20)",
+      "Read(//c/Users/cpete/OneDrive/Masaüstü/SCRIPTS/antigravity/**)",
+      "Bash(python -c \"import sqlalchemy, psycopg2; print\\('sqlalchemy', sqlalchemy.__version__, 'psycopg2 ok'\\)\")",
+      "Bash(mkdir -p certs)",
+      "Bash(cp ../../grk-automation/ca.crt ../../grk-automation/client.crt ../../grk-automation/client.key certs/)",
+      "Bash(rm -f server/iperf_server.py)"
     ]
   }
 }

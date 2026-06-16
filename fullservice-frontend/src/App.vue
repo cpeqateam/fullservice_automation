@@ -9,7 +9,10 @@
         <v-row>
           <!-- Ana içerik: cihaz formu + canlı test izleme -->
           <v-col cols="12" lg="9">
-            <DeviceForm class="mb-5" />
+            <!-- Cihaz/test formu dar tutulur; alttaki ilerleme kartları tam genişlikte kalır -->
+            <div class="form-wrap mb-5">
+              <DeviceForm />
+            </div>
 
             <div v-if="!appStore.nodes.length" class="empty">
               <v-progress-circular indeterminate color="primary" size="48" />
@@ -61,6 +64,8 @@ onBeforeUnmount(() => {
 
 <style>
 .app-root .v-application__wrap { background: transparent !important; }
+/* Cihaz/test formu kartı dar tutulur — eskiden tüm kolonu kaplıyordu */
+.form-wrap { max-width: 600px; }
 .empty { display: flex; flex-direction: column; align-items: center; padding: 80px 0; }
 .node-grid {
   display: grid;

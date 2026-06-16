@@ -26,6 +26,45 @@ DB_URL = os.environ.get(
 engine = None        # Bağlantı kurulursa SQLAlchemy Engine; aksi halde None
 SessionLocal = None  # Oturum fabrikası
 
+
+def _libpq_safe_path(path: str) -> str:
+    """
+    libpq (psycopg2) sertifika dosya yollarını işletim sisteminin ANSI kod
+    sayfasıyla açar; Windows'ta yol Türkçe/ASCII-dışı karakter içeriyorsa
+    (örn. "Masaüstü") dosya VAR olsa bile "does not exist" hatası verir.
+
+    Çözüm: ASCII-dışı yolu Windows kısa-yol (8.3) biçimine çevirir — bu daima
+    ASCII'dir. Kısa-yol üretilemezse (8.3 kapalı bir disk vb.) sertifikayı geçici
+    ASCII bir klasöre kopyalayıp oranın yolunu döner. ASCII yollar olduğu gibi
+    kalır; Linux/macOS bu fonksiyondan etkilenmez.
+    """
+    if not path or path.isascii():
+        return path
+
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import create_unicode_buffer
+            buf = create_unicode_buffer(1024)
+            n = ctypes.windll.kernel32.GetShortPathNameW(path, buf, 1024)
+            if n and buf.value and buf.value.isascii() and os.path.exists(buf.value):
+                return buf.value
+        except Exception:
+            pass
+
+    # Son çare: ASCII-güvenli geçici klasöre kopyala
+    try:
+        import shutil
+        import tempfile
+        safe_dir = os.path.join(tempfile.gettempdir(), "fs_certs")
+        os.makedirs(safe_dir, exist_ok=True)
+        dest = os.path.join(safe_dir, os.path.basename(path))
+        shutil.copyfile(path, dest)
+        return dest
+    except Exception:
+        return path
+
+
 try:
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import sessionmaker
@@ -33,9 +72,9 @@ try:
     cert_dir = os.path.abspath(CERT_DIR)
     ssl_args = {
         "sslmode":         "verify-ca",
-        "sslrootcert":     os.path.join(cert_dir, "ca.crt"),
-        "sslcert":         os.path.join(cert_dir, "client.crt"),
-        "sslkey":          os.path.join(cert_dir, "client.key"),
+        "sslrootcert":     _libpq_safe_path(os.path.join(cert_dir, "ca.crt")),
+        "sslcert":         _libpq_safe_path(os.path.join(cert_dir, "client.crt")),
+        "sslkey":          _libpq_safe_path(os.path.join(cert_dir, "client.key")),
         "connect_timeout": 5,
     }
     engine = create_engine(DB_URL, pool_pre_ping=True, connect_args=ssl_args)

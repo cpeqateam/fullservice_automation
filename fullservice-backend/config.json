@@ -43,7 +43,7 @@
       "id": "mac_cable",
       "label": "MAC (Kablo)",
       "conn": "cable",
-      "roles": ["youtube", "ping_modem", "ping_internet", "iperf"]
+      "roles": ["youtube", "ping_modem", "ping_internet", "iperf_server"]
     },
     {
       "id": "win_wifi",

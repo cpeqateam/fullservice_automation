@@ -18,7 +18,8 @@ class TestType(str, Enum):
     PING_INTERNET = "ping_internet"
     PING_MODEM = "ping_modem"
     YOUTUBE = "youtube"
-    IPERF = "iperf"
+    IPERF_SERVER = "iperf_server"   # kablolu Mac: iperf3 -s (dinler)
+    IPERF = "iperf"                 # wifi Mac: iperf3 -c (kablolu Mac'e yük basar)
     TORRENT = "torrent"
     WIFI_TRACK = "wifi_track"
 
@@ -28,7 +29,8 @@ TEST_LABELS: Dict[str, str] = {
     "ping_internet": "Ping → İnternet",
     "ping_modem": "Ping → Modem",
     "youtube": "YouTube",
-    "iperf": "iperf (Throughput)",
+    "iperf_server": "iperf (Server)",
+    "iperf": "iperf (Client)",
     "torrent": "Torrent",
     "wifi_track": "Wi-Fi Track",
 }
@@ -62,7 +64,7 @@ class TestParams(BaseModel):
     modem_ip: str = "192.168.1.1"
     internet_ip: str = "8.8.8.8"
     youtube_link: str = ""
-    iperf_server: str = ""     # Mac'ler buraya bağlanır = Linux sunucu LAN IP
+    iperf_server: str = ""     # Client Mac buraya bağlanır = iperf server rolündeki (kablolu) Mac'in LAN IP'si
     iperf_port: int = 5201
     iperf_parallel: int = 4
     duration: int = 60         # saniye (ping paket sayısı / test süresi)

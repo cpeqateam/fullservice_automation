@@ -22,7 +22,6 @@ from common.config import LOGS_DIR, detect_lan_ip
 from common.protocol import TestParams, TestStatus, TEST_LABELS
 from common.runners.base import RunContext
 from common.runners.registry import get_runner
-from server import iperf_server
 
 
 class Orchestrator:
@@ -129,6 +128,24 @@ class Orchestrator:
             "tests": node.get("tests", {}),
         }
 
+    def _iperf_server_ip(self) -> str:
+        """
+        iperf client'ın (wifi Mac) bağlanacağı adres = "iperf_server" rolündeki
+        (kablolu) Mac'in LAN IP'si. Önce agent kaydından gelen canlı IP kullanılır;
+        agent henüz kayıt olmadıysa config.json'daki statik atamaya (network.
+        assignments) düşülür. Hiçbiri yoksa boş döner (client anlaşılır hata verir).
+        """
+        server_node = next(
+            (n for n in self.nodes.values() if "iperf_server" in n.get("roles", [])),
+            None,
+        )
+        if not server_node:
+            return ""
+        if server_node.get("ip"):
+            return server_node["ip"]
+        assignments = self.config.get("network", {}).get("assignments", {})
+        return assignments.get(server_node["node_id"], {}).get("ip", "") or ""
+
     # ── Oturum başlat / durdur ───────────────────────────────
     def start_session(self, overrides: dict | None = None) -> dict:
         overrides = overrides or {}
@@ -138,7 +155,9 @@ class Orchestrator:
                 modem_ip=overrides.get("modem_ip") or self.defaults.get("modem_ip", "192.168.1.1"),
                 internet_ip=overrides.get("internet_ip") or self.defaults.get("internet_ip", "8.8.8.8"),
                 youtube_link=overrides.get("youtube_link") or self.defaults.get("youtube_link", ""),
-                iperf_server=self.server_lan_ip,
+                # iperf server artık kablolu Mac'te (iperf_server rolü) koşuyor;
+                # client (wifi Mac) bu adrese bağlanır.
+                iperf_server=self._iperf_server_ip(),
                 iperf_port=int(self.defaults.get("iperf_port", 5201)),
                 iperf_parallel=int(self.defaults.get("iperf_parallel", 4)),
                 duration=int(overrides.get("duration") or self.defaults.get("duration", 60)),
@@ -160,12 +179,11 @@ class Orchestrator:
                 for r in node["roles"]:
                     node["tests"][r] = self._blank_test()
 
-            # iperf rolü olan düğüm var mı? Varsa server'ı kaldır
-            needs_iperf = any("iperf" in n["roles"] for n in self.nodes.values())
             online_nodes = [self._node_view(n) for n in self.nodes.values()]
 
-        if needs_iperf:
-            iperf_server.ensure_running(params.iperf_port)
+        # iperf server'ı artık Linux sunucu değil, "iperf_server" rolündeki kablolu
+        # Mac kendi agent'ında koşturur (fan-out ile başlatılır). Sunucu tarafında
+        # ayrıca bir iperf3 -s ayağa kaldırmaya gerek yok.
 
         # Fan-out (lock dışında — ağ çağrıları bloke etmesin). Agent'lara komut
         # PARALEL gönderilir; kapalı bir client diğerlerini bekletmesin.

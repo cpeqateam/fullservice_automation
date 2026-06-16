@@ -101,7 +101,7 @@ _FALLBACK = {
         {"id": "server", "label": "Linux Sunucu (Kablo)", "conn": "cable", "is_server": True,
          "roles": ["ping_internet", "ping_modem", "youtube"]},
         {"id": "mac_cable", "label": "MAC (Kablo)", "conn": "cable",
-         "roles": ["youtube", "ping_modem", "ping_internet", "iperf"]},
+         "roles": ["youtube", "ping_modem", "ping_internet", "iperf_server"]},
         {"id": "win_wifi", "label": "WINDOWS (Wi-Fi)", "conn": "wifi",
          "roles": ["youtube", "ping_modem", "ping_internet", "torrent", "wifi_track"]},
         {"id": "mac_wifi", "label": "MAC (Wi-Fi)", "conn": "wifi",

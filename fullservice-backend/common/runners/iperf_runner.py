@@ -1,10 +1,14 @@
 """
-iperf3 client çalıştırıcı — Mac düğümlerinde çalışır, Linux sunucudaki
-iperf3 server'a bağlanıp hattı doldurarak modeme yük bindirir ("abanma").
+iperf3 client çalıştırıcı — wifi Mac düğümünde çalışır, kablolu Mac'teki
+iperf3 server'a (iperf_server rolü) bağlanıp hattı doldurarak modeme yük
+bindirir ("abanma"). Trafik iki Mac arasında modem üzerinden akar.
 
 Komut:  iperf3 -c <iperf_server> -p <port> -t <duration> -P <parallel>
 Çıktı log dosyasına yazılır; süre boyunca canlı ilerleme bildirilir; bitince
 özet (toplam throughput) mesaja eklenir. iperf3 kurulu değilse anlaşılır hata verir.
+
+Server ve client agent'ları PARALEL başlatıldığı için server (kablolu Mac) henüz
+dinlemiyor olabilir; bu yüzden bağlantı birkaç kez yeniden denenir.
 
 Kurulum:  Linux  → sudo apt install iperf3
           macOS  → brew install iperf3
@@ -25,46 +29,78 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
 
     if not server:
         ctx.progress(100.0, TestStatus.ERROR.value,
-                     "iperf server adresi boş (Linux sunucu LAN IP'si gerekli).")
+                     "iperf server adresi boş (kablolu Mac'in LAN IP'si gerekli).")
         return []
 
     duration = max(1, int(params.duration))
     cmd = ["iperf3", "-c", server, "-p", str(params.iperf_port),
            "-t", str(duration), "-P", str(params.iperf_parallel)]
 
+    MAX_ATTEMPTS = 5      # server (kablolu Mac) henüz dinlemiyor olabilir → yeniden dene
+    RETRY_WAIT = 2        # denemeler arası bekleme (sn)
+
     ctx.progress(0.0, TestStatus.RUNNING.value, f"iperf3 → {server}:{params.iperf_port}")
 
     try:
         with open(log_file, "w", encoding="utf-8", errors="replace") as f:
-            f.write(f"FULL Servis iperf3 — Node: {ctx.node_id}\n")
-            f.write(f"Komut: {' '.join(cmd)}\nBaslangic: {datetime.now()}\n" + "-" * 30 + "\n")
+            f.write(f"FULL Servis iperf3 CLIENT — Node: {ctx.node_id}\n")
+            f.write(f"Komut: {' '.join(cmd)}\nHedef: {server}:{params.iperf_port}\n")
+            f.write(f"Baslangic: {datetime.now()}\n" + "-" * 30 + "\n")
             f.flush()
-            try:
-                proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT,
-                                        text=True, creationflags=NO_WINDOW)
-            except FileNotFoundError:
-                msg = "iperf3 bulunamadı. Kurulum: apt install iperf3 / brew install iperf3"
-                f.write(msg + "\n")
-                ctx.progress(100.0, TestStatus.ERROR.value, msg)
-                return [log_file]
 
-            for i in range(duration):
+            proc = None
+            for attempt in range(1, MAX_ATTEMPTS + 1):
                 if ctx.stop.is_set():
-                    proc.terminate()
-                    ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "iperf durduruldu")
+                    ctx.progress(0.0, TestStatus.STOPPED.value, "iperf durduruldu")
                     return [log_file]
-                if proc.poll() is not None:
-                    break
-                time.sleep(1)
-                ctx.progress(((i + 1) / duration) * 100, TestStatus.RUNNING.value,
-                             f"iperf yük basıyor {i + 1}/{duration}s → {server}")
+                try:
+                    proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT,
+                                            text=True, creationflags=NO_WINDOW)
+                except FileNotFoundError:
+                    msg = "iperf3 bulunamadı. Kurulum: apt install iperf3 / brew install iperf3"
+                    f.write(msg + "\n")
+                    ctx.progress(100.0, TestStatus.ERROR.value, msg)
+                    return [log_file]
 
-            proc.wait(timeout=20)
+                # Süre boyunca canlı ilerleme
+                ran_full = True
+                for i in range(duration):
+                    if ctx.stop.is_set():
+                        proc.terminate()
+                        ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "iperf durduruldu")
+                        return [log_file]
+                    if proc.poll() is not None:
+                        ran_full = False     # süreden önce bitti → muhtemelen bağlantı hatası
+                        break
+                    time.sleep(1)
+                    ctx.progress(((i + 1) / duration) * 100, TestStatus.RUNNING.value,
+                                 f"iperf yük basıyor {i + 1}/{duration}s → {server}")
+
+                try:
+                    proc.wait(timeout=20)
+                except Exception:
+                    pass
+
+                # Başarılı (returncode 0) ya da süreyi tamamladıysa döngüden çık
+                if proc.returncode == 0:
+                    break
+                # Bağlantı erken koptu ve hâlâ deneme hakkı varsa: server'ın
+                # ayağa kalkmasını bekleyip yeniden bağlan.
+                if not ran_full and attempt < MAX_ATTEMPTS and not ctx.stop.is_set():
+                    f.write(f"\n[Deneme {attempt} basarisiz — server hazir degil, {RETRY_WAIT}s sonra yeniden]\n")
+                    f.flush()
+                    ctx.progress(0.0, TestStatus.RUNNING.value,
+                                 f"server bekleniyor… (deneme {attempt + 1}/{MAX_ATTEMPTS})")
+                    time.sleep(RETRY_WAIT)
+                    continue
+                break
+
             f.write("\n" + "-" * 30 + f"\nBitis: {datetime.now()}\n")
 
         summary = _parse_summary(log_file)
-        status = TestStatus.COMPLETED.value if proc.returncode == 0 else TestStatus.ERROR.value
-        ctx.progress(100.0, status, summary or ("iperf tamamlandı" if status == "completed" else "iperf hatası"))
+        rc = proc.returncode if proc else 1
+        status = TestStatus.COMPLETED.value if rc == 0 else TestStatus.ERROR.value
+        ctx.progress(100.0, status, summary or ("iperf tamamlandı" if status == "completed" else "iperf hatası — server'a bağlanılamadı"))
         return [log_file]
 
     except Exception as e:

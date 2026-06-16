@@ -22,9 +22,9 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
 
-// Türk Telekom magenta vurgusu — başlıklar/marka için yardımcı sınıf
+// Türk Telekom mavi vurgusu — başlıklar/marka için yardımcı sınıf
 .tt-gradient-text {
-  background: linear-gradient(45deg, #E20074, #FF4FAA);
+  background: linear-gradient(45deg, #0A84FF, #5AC8FA);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
