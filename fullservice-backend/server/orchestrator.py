@@ -12,6 +12,8 @@ Sorumlulukları:
 
 Tüm state bellekte tutulur ve _lock ile korunur (4 düğüm × ~6 test, düşük hacim).
 """
+from __future__ import annotations
+
 import os
 import threading
 from datetime import datetime

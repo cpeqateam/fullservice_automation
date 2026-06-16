@@ -7,6 +7,8 @@ Tek bir ortak durdurma bayrağı (Event) tüm testleri kapsar; sunucudan /stop
 gelince hepsi temiz çıkar. Sunucuya erişilemese bile testler yerelde çalışmaya
 devam eder (push/upload best-effort'tür, hata yutulur).
 """
+from __future__ import annotations
+
 import os
 import threading
 

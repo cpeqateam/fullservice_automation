@@ -14,26 +14,29 @@ gerekmesin. Tüm servisler boot'ta otomatik kalkar, çökerse kendini yeniden ba
 
 ## ⚠️ ÖNCE BUNU OKU: Kendi ağ adresini belirle
 
-Bu dokümandaki örnekler `192.168.1.x` ağına göre yazılmıştır. **Senin ağın farklı
-olabilir.** Önce öğren: herhangi bir makinede modemin/gateway'in adresine bak
-(Linux'ta `ip route | grep default` → "default via **192.168.X.1**" satırı).
+**Bu kurulumdaki ağ `192.168.1.x` (modem/gateway `192.168.1.1`).** Plan budur:
 
-- Modemin `192.168.1.1` ise → dokümandaki adresleri olduğu gibi kullan.
-- Modemin **`192.168.88.1`** ise (bu kurulumda böyle) → dokümandaki **her** `192.168.1.x`
-  yerine `192.168.88.x` oku. Yani:
+| Düğüm | Sabit IP | Arayüz (interface) |
+|------|----------|--------------------|
+| **server** (Linux VM) | **192.168.1.10** | `enp0s1` |
+| **mac_cable** | **192.168.1.11** | Ethernet adaptörü (ör. `AX88179A`) |
+| **win_wifi** | **192.168.1.13** | `Wi-Fi` |
+| **mac_wifi** | **192.168.1.14** | `Wi-Fi` |
+| gateway (modem) | **192.168.1.1** | — |
 
-| Düğüm | Bu kurulumdaki sabit IP'si |
-|------|----------------------------|
-| **server** (Linux VM) | **192.168.88.10** |
-| **mac_cable** | **192.168.88.11** |
-| **win_wifi** | **192.168.88.13** |
-| **mac_wifi** | **192.168.88.14** |
-| gateway (modem) | **192.168.88.1** |
+> 💡 Bu "sabit IP"leri **sen seçiyorsun** (modem otomatik vermez). Bir makine şu an
+> otomatik/DHCP bir adres almış olabilir (örn. `192.168.1.108`) — onu kullanma,
+> aşağıda `.10/.11/.13/.14`'e sabitleyeceğiz. Dashboard adresin
+> **http://192.168.1.10:8770** olacak.
 
-> 💡 Bu "sabit IP"leri **sen seçiyorsun** (modem otomatik vermez). Linux şu an
-> otomatik (DHCP) bir adres almış olabilir (örn. `192.168.88.41`) — onu kullanma,
-> aşağıda `.10`'a sabitleyeceğiz. Bundan sonra dashboard adresin
-> **http://192.168.88.10:8770** olacak.
+> **Modemin farklıysa** (ör. gateway `192.168.0.1`): `ip route | grep default` ile
+> öğren ve yukarıdaki **tüm** `192.168.1.x` adreslerini kendi ağına göre oku
+> (sadece ilk üç hane değişir).
+>
+> ⚠️ **Yanlış Wi-Fi tuzağı:** Kurulum sırasında yanlışlıkla başka bir Wi-Fi'ye
+> bağlanırsan ağ bambaşka görünür (ör. `192.168.88.x`). Statik IP'yi atamadan önce
+> **test modemine** bağlı olduğundan emin ol; değilse tüm makineler aynı modemde
+> olmaz ve birbirini göremez.
 
 ---
 
@@ -106,7 +109,7 @@ her makinede **arayüz adı** (interface). Onu da o makinedeyken öğreneceksin:
 > kullanacaksan kendi satırı (`assignments.<o_dugum>`). Sunucuyu nerede arayacağını
 > ise boot-autostart komutuna doğrudan yazıyoruz (`http://192.168.1.10:8770`), config'den
 > okumuyor. Yani agent'larda config'le fazla uğraşmana gerek yok.
-
+c
 ---
 
 ## 2. ŞAHSİ MACBOOK → Linux VM (sunucu)
@@ -175,7 +178,7 @@ ip -o link show
 ```bash
 ip route | grep default
 ```
-"default via **192.168.88.1**" → gateway budur (bu kurulumda `192.168.88.1`).
+"default via **192.168.1.1**" → gateway budur (bu kurulumda `192.168.1.1`).
 
 **Adım 3 — config.json'u düzenle.** Önce `fullservice-backend` klasöründe ol:
 ```bash
@@ -183,23 +186,23 @@ cd ~/fullservice_automation/fullservice-backend
 nano config.json
 ```
 Açılan **nano** editöründe (fare yok, ok tuşlarıyla gez) `network` ve `server`
-bölümlerini şöyle yap (IP'ler senin ağına, yani `192.168.88.x`):
+bölümlerini şöyle yap:
 ```json
 "network": {
   "subnet_mask": "255.255.255.0",
-  "gateway": "192.168.88.1",
+  "gateway": "192.168.1.1",
   "dns": ["8.8.8.8", "8.8.4.4"],
   "assignments": {
-    "server":    { "ip": "192.168.88.10", "interface": "enp0s1" },
-    "mac_cable": { "ip": "192.168.88.11", "interface": "Ethernet" },
-    "win_wifi":  { "ip": "192.168.88.13", "interface": "Wi-Fi" },
-    "mac_wifi":  { "ip": "192.168.88.14", "interface": "Wi-Fi" }
+    "server":    { "ip": "192.168.1.10", "interface": "enp0s1" },
+    "mac_cable": { "ip": "192.168.1.11", "interface": "AX88179A" },
+    "win_wifi":  { "ip": "192.168.1.13", "interface": "Wi-Fi" },
+    "mac_wifi":  { "ip": "192.168.1.14", "interface": "Wi-Fi" }
   }
 },
-"server": { "host": "0.0.0.0", "port": 8770, "lan_ip": "192.168.88.10" }
+"server": { "host": "0.0.0.0", "port": 8770, "lan_ip": "192.168.1.10" }
 ```
 > 🔑 İki yeri karıştırma: `assignments.server.ip` = makineye atanacak sabit IP;
-> `server.lan_ip` = "sunucu bu adreste" bilgisi. **İkisi de `192.168.88.10` olmalı.**
+> `server.lan_ip` = "sunucu bu adreste" bilgisi. **İkisi de `192.168.1.10` olmalı.**
 
 Kaydet ve çık: **Ctrl+O → Enter → Ctrl+X**.
 
@@ -207,19 +210,26 @@ Kaydet ve çık: **Ctrl+O → Enter → Ctrl+X**.
 ```bash
 sudo bash provisioning/linux/set-static-ip.sh server
 ```
-Şifre sorabilir. (Eğer SSH ile bağlıysan IP `.41`'den `.10`'a düşünce bağlantın
-kopar — UTM penceresinden yazıyorsan sorun olmaz.)
+Şifre sorabilir. (Eğer SSH ile bağlıysan IP değişince bağlantın kopar — UTM
+penceresinden yazıyorsan sorun olmaz.)
 
 **Adım 5 — Doğrula:**
 ```bash
-ip addr show enp0s1      # satırlardan birinde "inet 192.168.88.10/24" görünmeli
+ip addr show enp0s1      # satırlardan birinde "inet 192.168.1.10/24" görünmeli
+ip route | grep default  # "default via 192.168.1.1" olmalı
+ping -c 3 8.8.8.8        # internet gelmeli
 ```
-Artık sunucunun IP'si sabit: **192.168.88.10** (her açılışta aynı).
+Artık sunucunun IP'si sabit: **192.168.1.10** (her açılışta aynı).
 
 > **Script yerine elle yapmak istersen:** Ayarlar → Ağ → ⚙️ → IPv4 → **Manual** →
-> Adres `192.168.88.10`, Maske `255.255.255.0`, Gateway `192.168.88.1`, DNS `8.8.8.8`
+> Adres `192.168.1.10`, Maske `255.255.255.0`, Gateway `192.168.1.1`, DNS `8.8.8.8`
 > → Uygula, bağlantıyı kapat-aç. Bu durumda config'de yine `server.lan_ip` =
-> `192.168.88.10` olmalı (agent'lar sunucuyu orada arar).
+> `192.168.1.10` olmalı (agent'lar sunucuyu orada arar).
+>
+> 💡 **`git stash pop` çakışması yaşarsan** (config.json'da `<<<<<<<`, `=======`,
+> `>>>>>>>` satırları belirirse): bunlar git çakışma işaretleridir, geçerli JSON
+> değildir. nano ile aç, bu işaret satırlarını ve istemediğin kopyayı sil, doğru
+> tek sürümü bırak; `python3 -m json.tool config.json` ile hatasız olduğunu doğrula.
 
 ### 2.6 Sunucuyu boot'ta otomatik başlat (bir kez)
 ```bash
@@ -238,27 +248,74 @@ sudo bash provisioning/linux/install-server-systemd.sh
 
 Bu Mac'i modeme **Ethernet adaptörüyle kabloyla** bağla.
 
-### 3.1 Araçlar + kod (bir kez)
+### ⚠️ 3.0 Önce macOS sürümüne bak — eski Mac'lerde brew ÇALIŞMAZ
+ → **Bu Mac Hakkında** → macOS sürümü:
+- **macOS 11 (Big Sur) ve üstü** → modern Homebrew çalışır. En kolayı:
+  `brew install python git iperf3` (Homebrew yoksa https://brew.sh). Sonra 3.2'ye geç.
+- **macOS 10.13 / 10.14 (High Sierra / Mojave) — bu kurulumdaki Mac'ler böyle** →
+  **brew kurulmaz** ("Your version of macOS is too old to run Homebrew" hatası).
+  Aşağıdaki **brew'siz** yolu izle. (Mümkünse Mac'i macOS 11+'a güncellemek her şeyi
+  kolaylaştırır; güncelleyemiyorsan devam.)
+
+### 3.1 Araçları brew olmadan kur (eski macOS)
+
+**a) git + derleyici** (xcode komut satırı araçları — eski macOS'ta çalışır):
 ```bash
-brew install python git iperf3        # Homebrew yoksa: https://brew.sh
+xcode-select --install
+```
+
+**b) Python 3.9** — sistemdeki Python 2.7'yi KULLANMA, en yeni 3.13/3.14'ü de kurma
+(eski macOS'ta paketler kurulmaz). High Sierra'yı destekleyen sürüm **3.9.13**:
+- Tarayıcı: https://www.python.org/downloads/release/python-3913/
+- En altta **"macOS 64-bit Intel installer"** (universal2 değil, **Intel**) indir, kur.
+- Doğrula: `python3.9 --version`
+
+**c) iperf3** — brew yok, kaynaktan derle (xcode-select sonrası):
+```bash
+curl -L -o iperf3.tar.gz https://downloads.es.net/pub/iperf/iperf-3.17.1.tar.gz
+tar xzf iperf3.tar.gz && cd iperf-3.17.1
+./configure && make && sudo make install
+iperf3 --version
+cd ~
+```
+> Link hata verirse https://software.es.net/iperf/ adresinden güncel kaynağı indir.
+
+### 3.2 Kod + venv (python3.9 ile)
+```bash
 cd ~ && git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation && git checkout aliimran
 cd fullservice-backend
-python3 -m venv venv && source venv/bin/activate
+python3.9 -m venv venv && source venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3.2 Statik IP (Ethernet)
-```bash
-networksetup -listallnetworkservices   # Ethernet adaptörünün adını gör
-# config.json'da assignments.mac_cable.interface'i o ada eşitle (bir kez).
-# config'i Adım 2.5'te push'ladıysan zaten doğru gelmiştir; sadece arayüz adını teyit et.
-sudo bash provisioning/macos/set-static-ip.sh mac_cable
-```
+### 3.3 Statik IP — Ethernet adaptörünü bul, sonra ELLE ata
 
-### 3.3 Agent'ı boot'ta otomatik başlat (bir kez)
-> **Önemli:** launchd, kurulum anındaki `python3`'ü kaydeder. Doğru bağımlılıkların
-> bulunması için **önce venv'i aktif et**, sonra kur:
+**Önce adaptör adını bul.** Adaptörü modeme kabloyla takılıyken her adayı yokla;
+hangisi `192.168.1.x` bir IP gösteriyorsa modeme bağlı olan **odur**:
+```bash
+networksetup -listallnetworkservices            # tüm arayüz adları
+networksetup -getinfo "AX88179A"                # IP address: 192.168.1.x → bu!
+networksetup -getinfo "USB 10/100/1000 LAN"     # değilse diğerlerini dene
+```
+(Bu kurulumda type-c adaptör **`AX88179A`** çıktı.)
+
+**Sonra IP'yi ELLE ata.** ⚠️ macOS'un eski bash'i (3.2) `mapfile` içermediği için
+`set-static-ip.sh` script'i eski Mac'lerde **çalışmaz** (`mapfile: command not found`).
+O yüzden script yerine doğrudan `networksetup` kullan — script'in yaptığının aynısı:
+```bash
+sudo networksetup -setmanual "AX88179A" 192.168.1.11 255.255.255.0 192.168.1.1
+sudo networksetup -setdnsservers "AX88179A" 8.8.8.8 8.8.4.4
+networksetup -getinfo "AX88179A"                # IP address: 192.168.1.11 → tamam
+```
+> `"AX88179A"` yerine kendi adaptör adını yaz. (Script güncellendi; ileride `git pull`
+> yapan yeni macOS Mac'lerde `set-static-ip.sh` de çalışır, ama eski Mac'te elle komut
+> en garantisi.)
+
+### 3.4 Agent'ı boot'ta otomatik başlat (bir kez)
+> **Önemli:** launchd, kurulum anındaki python'u kaydeder. Bağımlılıkların bulunması
+> için **önce venv'i aktif et**, sonra kur:
 ```bash
 source venv/bin/activate
 bash provisioning/macos/install-agent-launchd.sh mac_cable http://192.168.1.10:8770 7531
@@ -272,22 +329,30 @@ bash provisioning/macos/install-agent-launchd.sh mac_cable http://192.168.1.10:8
 
 ## 4. YENİ MACBOOK #2 → `mac_wifi` (Wi-Fi, iperf client)
 
-Bu Mac'i modemin **Wi-Fi**'sine bağla.
+Bu Mac'i modemin **Wi-Fi**'sine bağla. Adımlar Mac #1 ile **aynı**; tek farklar:
+arayüz `Wi-Fi`, IP `192.168.1.14`, node id `mac_wifi`.
 
+**4.1 Araçlar** — Bölüm 3.0 + 3.1'i aynen uygula (macOS eskiyse: xcode-select,
+Python 3.9.13, iperf3 kaynaktan).
+
+**4.2 Kod + venv** — Bölüm 3.2 ile aynı:
 ```bash
-# 4.1 Araçlar + kod (bir kez) — Mac #1 ile aynı:
-brew install python git iperf3
 cd ~ && git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation && git checkout aliimran
 cd fullservice-backend
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+python3.9 -m venv venv && source venv/bin/activate
+pip install --upgrade pip && pip install -r requirements.txt
+```
 
-# 4.2 Statik IP (Wi-Fi):
-networksetup -listallnetworkservices   # genelde "Wi-Fi"
-sudo bash provisioning/macos/set-static-ip.sh mac_wifi
+**4.3 Statik IP (Wi-Fi) — elle ata** (Wi-Fi'nin adı genelde tam olarak `Wi-Fi`):
+```bash
+sudo networksetup -setmanual "Wi-Fi" 192.168.1.14 255.255.255.0 192.168.1.1
+sudo networksetup -setdnsservers "Wi-Fi" 8.8.8.8 8.8.4.4
+networksetup -getinfo "Wi-Fi"                   # IP address: 192.168.1.14 → tamam
+```
 
-# 4.3 Agent'ı boot'ta başlat (venv aktifken!):
+**4.4 Agent'ı boot'ta başlat (venv aktifken!):**
+```bash
 source venv/bin/activate
 bash provisioning/macos/install-agent-launchd.sh mac_wifi http://192.168.1.10:8770 7531
 ```
@@ -302,8 +367,13 @@ Windows'u modemin **Wi-Fi**'sine bağla. Aşağıdakileri **Yönetici PowerShell
 
 ### 5.1 Araçlar + kod (bir kez)
 1. **Python** (python.org) — kurarken **"Add python.exe to PATH"** işaretle.
-2. **iperf3** — Windows binary'sini indirip bir klasöre koy, PATH'e ekle.
-3. **Git** (git-scm.com).
+2. **Git** (git-scm.com).
+
+> ℹ️ **iperf3 GEREKMEZ:** `win_wifi`'nin rolleri `youtube, ping, torrent, wifi_track` —
+> iperf yok (iperf yalnızca iki Mac arasında çalışır). Windows'a iperf3 kurmana gerek
+> yok, bu adımı atla. (Yine de manuel iperf testi yapmak istersen: https://files.budman.pw/
+> veya https://iperf.fr adresinden win64 zip indir → bir klasöre çıkar → o klasörü PATH'e
+> ekle. iperf3.exe + cygwin1.dll birlikte dursun.)
 ```powershell
 git clone https://github.com/cpeqateam/fullservice_automation.git
 cd fullservice_automation; git checkout aliimran
@@ -370,6 +440,30 @@ otomatik yeniden başlar.
 | macOS agent kalkmıyor | venv aktif **değilken** mi kurdun? `launchctl unload` edip venv aktifken tekrar kur. Log: `logs/agent-launchd.err.log` |
 | Windows görevi çalışmıyor | `Get-ScheduledTask FullServiceAgent_win_wifi`; venv kuruluysa python doğru bulunur. Elle: `Start-ScheduledTask` |
 | Marka/Model **boş / serbest metin** | Sunucuda `certs/` (ca/client.crt+key) eksik veya DB'ye ağ yok. Beklenen geri-düşüş; test yine başlar. |
-| **iperf** kutusu kırmızı | İlgili Mac'te `iperf3` yok (`brew install iperf3`) **veya** `mac_cable` (server) ayakta değil — client onu bekler, 5 kez yeniden dener. |
+| **iperf** kutusu kırmızı | İlgili Mac'te `iperf3` yok (eski macOS: 3.1c'deki kaynaktan derleme) **veya** `mac_cable` (server) ayakta değil — client onu bekler, 5 kez yeniden dener. |
 | Statik IP atanmadı (Linux) | Ubuntu'da NetworkManager (nmcli) gerekir; `ubuntu-desktop` kuruluysa vardır. Arayüz adını `ip -o link show` ile teyit et. |
-| macOS Ethernet servis adı farklı | Adaptöre göre `USB 10/100/1000 LAN` vb. olabilir; `networksetup -listallnetworkservices` çıktısını config'e yaz. |
+| macOS Ethernet servis adı farklı | Adaptöre göre `AX88179A` / `USB 10/100/1000 LAN` vb. olabilir; `networksetup -getinfo "<ad>"` ile `192.168.1.x` IP göstereni bul. |
+| **brew kurulmuyor** ("macOS too old") | Mac eski (10.13/10.14). brew yok; Bölüm 3.1'deki brew'siz yolu kullan (xcode-select + Python 3.9.13 + iperf3 kaynaktan). Mümkünse macOS 11+'a güncelle. |
+| **`mapfile: command not found`** | macOS bash 3.2 eski. `set-static-ip.sh` yerine elle `sudo networksetup -setmanual "<arayüz>" <ip> 255.255.255.0 192.168.1.1` kullan (Bölüm 3.3). |
+| **pip install patlıyor** (eski Mac) | En yeni Python (3.13/3.14) kurmuşsundur; eski macOS'a wheel yok. **Python 3.9.13 Intel** kur, `python3.9 -m venv venv` ile baştan. |
+| config.json'da `<<<<<<<` / `=======` | `git stash pop`/merge çakışması işaretleri — geçerli JSON değil. Sil, tek doğru sürümü bırak, `python3 -m json.tool config.json` ile doğrula. |
+| `mv` "No such file or directory" | Hedef klasör yok ya da yolu yanlış (ör. `~/aliimran` yerine `~/Desktop/aliimran`). Önce `find ~ -type d -name fullservice_automation` ile yeri bul. |
+
+
+KRİTİK
+Çözüm: iade etmeden önce 1 komutla eski haline döndür
+Mac'i geri vereceğin zaman otomatiğe (DHCP) çevir, böylece "senden önceki gibi" olur:
+
+
+# mac_cable (Ethernet adaptörü):
+sudo networksetup -setdhcp "AX88179A"
+
+# mac_wifi (Wi-Fi):
+sudo networksetup -setdhcp "Wi-Fi"
+(GUI ile: Ayarlar → Ağ → ilgili arayüz → IPv4 → Using DHCP.) Bu, internet/DNS dahil her şeyi otomatiğe döndürür.
+
+Boot-otomatik (launchd) kurduysan onu da kaldır
+Eğer agent'ı boot'ta başlatma adımını (install-agent-launchd.sh) çalıştırdıysan, arka planda bir servis kalır. İadeden önce temizle:
+
+launchctl unload ~/Library/LaunchAgents/com.tt.fullservice.agent.*.plist 2>/dev/null
+rm ~/Library/LaunchAgents/com.tt.fullservice.agent.*.plist 2>/dev/null

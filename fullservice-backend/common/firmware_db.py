@@ -13,6 +13,8 @@ frontend de combobox'ları serbest-metin girişine düşürür (GRK ile aynı da
 Sertifikalar `common/config.py:CERT_DIR` (varsayılan: fullservice-backend/certs/)
 altında aranır: ca.crt, client.crt, client.key. Bunlar repoya KONULMAZ (gizli).
 """
+from __future__ import annotations
+
 import os
 
 from common.config import CERT_DIR

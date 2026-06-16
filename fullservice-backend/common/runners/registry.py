@@ -5,6 +5,8 @@ Hem agent (yerel testler) hem sunucu (kendi rolleri) buradan runner çözer.
 Yeni bir test tipi eklemek için: runner dosyasını yaz, TestType'a değer ekle,
 buraya bir satır ekle. Başka yeri değiştirmek gerekmez.
 """
+from __future__ import annotations
+
 from typing import Callable, Dict, List
 
 from common.protocol import TestType, TestParams

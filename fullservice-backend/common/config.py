@@ -7,6 +7,8 @@ iki üst klasörü) aranır; ortam değişkeni FULLSERVICE_CONFIG ile override e
 GRK'daki config.py'nin (yol sabitleri) dağıtık karşılığıdır; ek olarak 4 düğümlü
 topolojiyi ve varsayılan test parametrelerini tutar.
 """
+from __future__ import annotations
+
 import json
 import os
 import socket
