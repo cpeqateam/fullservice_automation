@@ -49,6 +49,10 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             log("Web UI giris basarisiz.")
             return [log_file]
 
+        # Bu kadar bayt inince hepsini silip yeniden başla (disk dolmasın + sürekli yük).
+        # 0 ise: yalnızca %100 tamamlanınca sil.
+        recycle_bytes = max(0.0, float(params.torrent_recycle_gb)) * 1_000_000_000
+
         iteration = 0
         while not ctx.stop.is_set():
             iteration += 1
@@ -57,28 +61,38 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             log(f"#{iteration} torrent eklendi")
             ctx.progress(10.0, TestStatus.RUNNING.value, f"#{iteration} — İndirme izleniyor...")
 
-            # İndirme tamamlanana kadar ilerlemeyi yansıt
+            recycle = False
+            # İndirme tamamlanana VEYA boyut sınırına gelene kadar ilerlemeyi yansıt
             while not ctx.stop.is_set():
                 torrents = torrent_util.list_torrents(session, QB_URL)
                 if torrents:
                     avg = sum(t["progress"] for t in torrents) / len(torrents)
+                    downloaded = sum(t.get("completed", 0) for t in torrents)  # diskteki bayt
+                    gb = downloaded / 1_000_000_000
                     pct = 10.0 + avg * 85.0
                     ctx.progress(pct, TestStatus.RUNNING.value,
-                                 f"#{iteration} — İndiriliyor %{avg * 100:.0f}")
+                                 f"#{iteration} — İndiriliyor %{avg * 100:.0f} ({gb:.1f} GB)")
                     if all(t["progress"] == 1.0 for t in torrents):
+                        break
+                    if recycle_bytes and downloaded >= recycle_bytes:
+                        recycle = True
                         break
                 time.sleep(3)
 
             if ctx.stop.is_set():
                 break
 
-            ctx.progress(97.0, TestStatus.RUNNING.value, f"#{iteration} — Tamamlandı, siliniyor...")
-            torrent_util.remove_torrent_and_files(session, QB_URL)
-            log(f"#{iteration} tamamlandi, dosyalar silindi, dongu yeniden")
+            # Tamamlandı ya da sınıra gelindi → HEPSİNİ diskten sil, döngü yeniden
+            reason = f"{params.torrent_recycle_gb} GB sınırı" if recycle else "tamamlandı"
+            ctx.progress(97.0, TestStatus.RUNNING.value, f"#{iteration} — {reason}, siliniyor...")
+            torrent_util.remove_all_torrents(session, QB_URL)
+            log(f"#{iteration} {reason}, dosyalar silindi, dongu yeniden")
             time.sleep(2)
 
-        ctx.progress(100.0, TestStatus.STOPPED.value, "Torrent durduruldu")
-        log("Durduruldu.")
+        # Çıkarken yarım kalan indirmeyi de diskten temizle
+        torrent_util.remove_all_torrents(session, QB_URL)
+        ctx.progress(100.0, TestStatus.STOPPED.value, "Torrent durduruldu (dosyalar silindi)")
+        log("Durduruldu, dosyalar silindi.")
         return [log_file]
 
     except Exception as e:

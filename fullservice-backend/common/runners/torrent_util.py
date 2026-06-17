@@ -150,8 +150,19 @@ def remove_torrent_and_files(session, qb_url):
     """Tamamlanan (%100) torrentleri ve indirilen dosyaları siler."""
     for t in list_torrents(session, qb_url):
         if t.get("progress") == 1.0:
-            try:
-                session.post(f"{qb_url}/api/v2/torrents/delete",
-                             data={"hashes": t["hash"], "deleteFiles": "true"}, timeout=10)
-            except Exception as e:
-                print(f"[TORRENT] silme hatasi: {e}")
+            _delete(session, qb_url, t["hash"])
+
+
+def remove_all_torrents(session, qb_url):
+    """TÜM torrentleri (tamamlanmasa bile) ve indirilen dosyaları diskten siler."""
+    for t in list_torrents(session, qb_url):
+        _delete(session, qb_url, t["hash"])
+
+
+def _delete(session, qb_url, torrent_hash):
+    """Tek bir torrenti qBittorrent'ten + diskten kaldırır (deleteFiles=true)."""
+    try:
+        session.post(f"{qb_url}/api/v2/torrents/delete",
+                     data={"hashes": torrent_hash, "deleteFiles": "true"}, timeout=10)
+    except Exception as e:
+        print(f"[TORRENT] silme hatasi: {e}")

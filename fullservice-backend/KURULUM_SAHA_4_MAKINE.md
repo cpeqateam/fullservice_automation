@@ -5,10 +5,10 @@ makinesi. Amaç: her makinede ayarları **yalnızca BİR KEZ** yapmak; sonrasın
 bilgisayarları açmak ve dashboard'da **Başlat**'a basmak dışında hiçbir şey
 gerekmesin. Tüm servisler boot'ta otomatik kalkar, çökerse kendini yeniden başlatır.
 
-> Bu doküman VM-lab rehberi [`KURULUM_TEST.md`](KURULUM_TEST.md)'nin yerine geçen
-> **saha** sürümüdür. Lab'da tek Mac iki düğümü üstleniyordu; burada **her makine
-> tek düğüm** çalıştırır, bu yüzden hepsi aynı **7531** portunu kullanır (port
-> ayarıyla uğraşmak yok).
+> Bu doküman VM-lab rehberi [`KURULUM_VM_LAB_TEK_MAC.md`](KURULUM_VM_LAB_TEK_MAC.md)'nin
+> yerine geçen **saha** sürümüdür. Lab'da tek Mac iki düğümü üstleniyordu; burada
+> **her makine tek düğüm** çalıştırır, bu yüzden hepsi aynı **7531** portunu kullanır
+> (port ayarıyla uğraşmak yok).
 
 ---
 
@@ -109,7 +109,7 @@ her makinede **arayüz adı** (interface). Onu da o makinedeyken öğreneceksin:
 > kullanacaksan kendi satırı (`assignments.<o_dugum>`). Sunucuyu nerede arayacağını
 > ise boot-autostart komutuna doğrudan yazıyoruz (`http://192.168.1.10:8770`), config'den
 > okumuyor. Yani agent'larda config'le fazla uğraşmana gerek yok.
-c
+
 ---
 
 ## 2. ŞAHSİ MACBOOK → Linux VM (sunucu)
@@ -117,7 +117,7 @@ c
 Sunucu, şahsi MacBook'ta bir UTM sanal makinesinde Ubuntu olarak çalışır.
 
 ### 2.1 Ubuntu VM'i kur (bir kez)
-UTM kurulumu ve Ubuntu adımları için [`KURULUM_TEST.md` → BÖLÜM 1](KURULUM_TEST.md)
+UTM kurulumu ve Ubuntu adımları için [`KURULUM_VM_LAB_TEK_MAC.md` → BÖLÜM 1](KURULUM_VM_LAB_TEK_MAC.md)
 bölümünü izle (ISO indir → VM oluştur → Ubuntu kur → **ubuntu-desktop** kur →
 **Network Mode = Bridged**). Bridged şart: VM gerçek LAN IP'si alır.
 
@@ -154,17 +154,26 @@ oluşturup içine **3 dosyayı** koyacaksın:
 mkdir -p certs
 # Sonra ca.crt + client.crt + client.key dosyalarını GRK'dan alıp bu certs/ klasörüne kopyala.
 ls certs    # üç dosyayı da görmelisin
+
+# ⚠️ ZORUNLU: özel anahtarın izinlerini kısıtla (yoksa psycopg2 reddeder)
+chmod 600 certs/client.key
+chmod 644 certs/ca.crt certs/client.crt
 ```
 
-Koymazsan sistem **çökmez**: Marka/Model/Firmware kutuları otomatik **serbest-metin**
-girişine düşer, test yine başlatılır. Yalnızca **sunucuya** gerekir (agent'lara değil).
+> ⚠️ **`client.key` izinleri:** USB/scp ile kopyalayınca dosya "herkes okuyabilir"
+> gelir; libpq/psycopg2 bunu güvenlik gereği reddeder ("private key file has group or
+> world access"). Bu yüzden **`chmod 600 certs/client.key` şarttır.**
+
+Koymazsan/izin yanlışsa sistem **çökmez**: Marka/Model/Firmware kutuları otomatik
+**serbest-metin** girişine düşer, test yine başlatılır. Yalnızca **sunucuya** gerekir
+(agent'lara değil).
 
 > Not: Linux dosya yolu ASCII olduğu için, Windows'ta yaşanan "Masaüstü" Türkçe-karakter
-> sorunu burada olmaz; certleri koyman yeterli.
+> sorunu burada olmaz; certleri koyup `chmod 600` yapman yeterli.
 
 ### 2.5 Sunucunun statik IP'sini ayarla (adım adım)
 
-**Amaç:** Linux her açılışta aynı IP'yi (`192.168.88.10`) alsın. Şu an otomatik
+**Amaç:** Linux her açılışta aynı IP'yi (`192.168.1.10`) alsın. Şu an otomatik
 (DHCP) bir IP aldığı için her seferinde değişiyor; bunu sabitleyeceğiz.
 
 **Adım 1 — Arayüz adını öğren** (zaten `enp0s1` olduğunu gördüysen atla):
@@ -241,6 +250,20 @@ sudo bash provisioning/linux/install-server-systemd.sh
   bir cihazdan **http://192.168.1.10:8770**).
 
 ✅ Sunucu artık VM her açıldığında kendiliğinden kalkar.
+
+### 2.7 Log klasör yapısı (bilgisayar başına)
+Sunucu, her düğümden gelen logları **o bilgisayarın klasörü** altında toplar:
+`logs/<BILGISAYAR>/<oturum_id>/`. Klasörler otomatik oluşur ama önceden kurmak istersen:
+```bash
+cd ~/fullservice_automation/fullservice-backend
+mkdir -p logs/LINUX logs/MAC_ETH logs/MAC_WIFI logs/WIN_WIFI
+```
+Eşleme `config.json`'daki `log_name` alanlarından gelir:
+server→**LINUX**, mac_cable→**MAC_ETH**, mac_wifi→**MAC_WIFI**, win_wifi→**WIN_WIFI**.
+
+> Log akışı: (1) agent kendi makinesinin `logs/` klasörüne yazar → (2) HTTP ile
+> sunucuya yüklenir (yukarıdaki bilgisayar klasörleri). (3) Genel FTP sunucusuna
+> aktarım henüz eklenmedi (sonraki faz).
 
 ---
 
@@ -368,6 +391,10 @@ Windows'u modemin **Wi-Fi**'sine bağla. Aşağıdakileri **Yönetici PowerShell
 ### 5.1 Araçlar + kod (bir kez)
 1. **Python** (python.org) — kurarken **"Add python.exe to PATH"** işaretle.
 2. **Git** (git-scm.com).
+3. **Google Chrome** — YouTube'u en yüksek kaliteye zorlamak için (Selenium Chrome'u kullanır).
+4. **qBittorrent** — torrent testi için. Kurduktan sonra **Araçlar → Seçenekler → Web
+   Arayüzü**'nü aç: işaretle, port **8080**, kullanıcı **admin**, şifre **Admin123**.
+   (Bunlar koddaki değerlerle aynı olmalı; `config.json → torrent_magnet` GTA5'tir.)
 
 > ℹ️ **iperf3 GEREKMEZ:** `win_wifi`'nin rolleri `youtube, ping, torrent, wifi_track` —
 > iperf yok (iperf yalnızca iki Mac arasında çalışır). Windows'a iperf3 kurmana gerek
@@ -439,7 +466,11 @@ otomatik yeniden başlar.
 | Health-Check **kırmızı** | O düğümün listener'ı (7531) ayakta mı? Başka makineden `curl http://<dugum_ip>:7531/health` |
 | macOS agent kalkmıyor | venv aktif **değilken** mi kurdun? `launchctl unload` edip venv aktifken tekrar kur. Log: `logs/agent-launchd.err.log` |
 | Windows görevi çalışmıyor | `Get-ScheduledTask FullServiceAgent_win_wifi`; venv kuruluysa python doğru bulunur. Elle: `Start-ScheduledTask` |
-| Marka/Model **boş / serbest metin** | Sunucuda `certs/` (ca/client.crt+key) eksik veya DB'ye ağ yok. Beklenen geri-düşüş; test yine başlar. |
+| Marka/Model **boş / serbest metin** | Sunucuda `certs/` (ca/client.crt+key) eksik, **izin yanlış** veya DB'ye ağ yok. Beklenen geri-düşüş; test yine başlar. |
+| **"private key file ... has group or world access"** | `client.key` izni gevşek → `chmod 600 certs/client.key`, sonra sunucuyu yeniden başlat. |
+| **YouTube en yüksek kalitede açılmıyor** | O makinede **Chrome kurulu değil** veya `selenium` yok → basit tarayıcıya düşer. `pip install -r requirements.txt` + Chrome kur. (Çok eski macOS'ta Chrome desteklenmeyebilir.) |
+| **Terminal pencereleri açılmıyor (ping/wifi)** | Agent/sunucu **boot servisinden** (systemd/SYSTEM görevi) çalışıyordur → masaüstü yok → pencere açılmaz. Görmek istiyorsan **elle, masaüstü oturumunda** çalıştır. |
+| **torrent "Web UI'ye giriş yapılamadı"** | Windows'ta qBittorrent kapalı veya Web UI ayarı eksik. Web Arayüzü'nü aç (port 8080, admin/Admin123). |
 | **iperf** kutusu kırmızı | İlgili Mac'te `iperf3` yok (eski macOS: 3.1c'deki kaynaktan derleme) **veya** `mac_cable` (server) ayakta değil — client onu bekler, 5 kez yeniden dener. |
 | Statik IP atanmadı (Linux) | Ubuntu'da NetworkManager (nmcli) gerekir; `ubuntu-desktop` kuruluysa vardır. Arayüz adını `ip -o link show` ile teyit et. |
 | macOS Ethernet servis adı farklı | Adaptöre göre `AX88179A` / `USB 10/100/1000 LAN` vb. olabilir; `networksetup -getinfo "<ad>"` ile `192.168.1.x` IP göstereni bul. |
@@ -450,20 +481,28 @@ otomatik yeniden başlar.
 | `mv` "No such file or directory" | Hedef klasör yok ya da yolu yanlış (ör. `~/aliimran` yerine `~/Desktop/aliimran`). Önce `find ~ -type d -name fullservice_automation` ile yeri bul. |
 
 
-KRİTİK
-Çözüm: iade etmeden önce 1 komutla eski haline döndür
-Mac'i geri vereceğin zaman otomatiğe (DHCP) çevir, böylece "senden önceki gibi" olur:
+---
 
+## 8. ⚠️ Emanet Mac'leri iade ederken (eski haline döndür)
 
+Test Mac'leri başkasından emanetse, geri vermeden önce yaptığın değişiklikleri geri al
+ki "senden önceki gibi" olsun.
+
+**1) Statik IP'yi otomatiğe (DHCP) çevir:**
+```bash
 # mac_cable (Ethernet adaptörü):
 sudo networksetup -setdhcp "AX88179A"
-
 # mac_wifi (Wi-Fi):
 sudo networksetup -setdhcp "Wi-Fi"
-(GUI ile: Ayarlar → Ağ → ilgili arayüz → IPv4 → Using DHCP.) Bu, internet/DNS dahil her şeyi otomatiğe döndürür.
+```
+(GUI ile: Ayarlar → Ağ → ilgili arayüz → IPv4 → **Using DHCP**.) Bu, internet/DNS dahil
+her şeyi otomatiğe döndürür.
 
-Boot-otomatik (launchd) kurduysan onu da kaldır
-Eğer agent'ı boot'ta başlatma adımını (install-agent-launchd.sh) çalıştırdıysan, arka planda bir servis kalır. İadeden önce temizle:
-
+**2) Boot-otomatik (launchd) kurduysan kaldır:**
+```bash
 launchctl unload ~/Library/LaunchAgents/com.tt.fullservice.agent.*.plist 2>/dev/null
 rm ~/Library/LaunchAgents/com.tt.fullservice.agent.*.plist 2>/dev/null
+```
+
+> Kurduğun araçlar (Python, iperf3, Chrome, repo klasörü) makinede kalabilir — zararsız;
+> istersen klasörü ve araçları da silebilirsin.

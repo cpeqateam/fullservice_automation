@@ -68,6 +68,7 @@ class TestParams(BaseModel):
     iperf_port: int = 5201
     iperf_parallel: int = 4
     torrent_magnet: str = ""   # Windows torrent testi için magnet link (qBittorrent'e eklenir)
+    torrent_recycle_gb: float = 5  # bu kadar GB inince hepsini silip yeniden başlat (0 = sadece %100'de sil)
     duration: int = 60         # saniye (ping paket sayısı / test süresi)
     extra: Dict[str, Any] = {}
 

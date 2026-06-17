@@ -1,7 +1,19 @@
-# FULL Servis — Test Lab Kurulumu (Linux + Mac + Windows)
+# FULL Servis — VM Lab Kurulumu (TEK Mac üzerinde deneme)
 
-Bu rehber, M4 MacBook (16 GB) üzerinde **3 makineli** test ortamını sıfırdan kurar.
-Hiç sanal makine kurmamış biri için ekran ekran yazılmıştır.
+Bu rehber, **tek bir M4 MacBook (16 GB)** üzerinde tüm sistemi (Linux VM + 2 Mac
+düğümü host'ta + Windows VM) çalıştırıp **yazılımın doğru çalıştığını kanıtlamak**
+içindir. Hiç sanal makine kurmamış biri için ekran ekran yazılmıştır.
+
+> 📌 **Hangi dokümanı kullanmalıyım?**
+> - **Bu dosya (`KURULUM_VM_LAB_TEK_MAC.md`)** → tek Mac'te hızlı **deneme/lab**.
+> - **Gerçek saha (4 ayrı fiziksel makine)** → [`KURULUM_SAHA_4_MAKINE.md`](KURULUM_SAHA_4_MAKINE.md).
+>   Statik IP planı, sertifika izinleri (`chmod 600`), qBittorrent/Chrome ön koşulları,
+>   log klasör yapısı ve iade adımları orada güncel tutulur — saha için **onu** izle.
+
+> ℹ️ **Güncel kod davranışı (bu lab'da da geçerli):** iperf artık Linux'ta değil,
+> **kablolu Mac `iperf3 -s` (server) + Wi-Fi Mac client** olarak çalışır. torrent
+> (qBittorrent) ve wifi_track artık **gerçek**tir (simülasyon değil); ping/wifi_track
+> görünür terminal açar; YouTube en yüksek kaliteyi dener (Chrome+selenium).
 
 ---
 

@@ -30,7 +30,11 @@
       "Bash(python -c \"import sqlalchemy, psycopg2; print\\('sqlalchemy', sqlalchemy.__version__, 'psycopg2 ok'\\)\")",
       "Bash(mkdir -p certs)",
       "Bash(cp ../../grk-automation/ca.crt ../../grk-automation/client.crt ../../grk-automation/client.key certs/)",
-      "Bash(rm -f server/iperf_server.py)"
+      "Bash(rm -f server/iperf_server.py)",
+      "Bash(ls -la *.md *.drawio)",
+      "Bash(ls -la kodhakimiyeti.md kod_hakimiyet*.md)",
+      "Bash(wc -l MIMARI.md README.md fullservice-backend/README.md fullservice-frontend/README.md)",
+      "Bash(python -c \"import xml.dom.minidom; xml.dom.minidom.parse\\('../MIMARI.drawio'\\); print\\('drawio XML gecerli'\\)\")"
     ]
   }
 }

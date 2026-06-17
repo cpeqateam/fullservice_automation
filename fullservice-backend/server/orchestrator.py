@@ -163,6 +163,7 @@ class Orchestrator:
                 iperf_port=int(self.defaults.get("iperf_port", 5201)),
                 iperf_parallel=int(self.defaults.get("iperf_parallel", 4)),
                 torrent_magnet=overrides.get("torrent_magnet") or self.defaults.get("torrent_magnet", ""),
+                torrent_recycle_gb=float(self.defaults.get("torrent_recycle_gb", 5)),
                 duration=int(overrides.get("duration") or self.defaults.get("duration", 60)),
             )
             self.session = {

@@ -24,9 +24,14 @@ fullservice_automation/
 │   ├── src/  package.json  vite.config.js
 │   └── README.md                        # frontend dokümantasyonu (dev/build, bileşenler)
 │
-├── MIMARI.md                            # Kod hakimiyeti rehberi: runner'lar, sunucu↔agent akışı
+├── MIMARI.md                            # Mimari kararlar + akış (sunucu↔agent, runner'lar)
+├── KOD_HAKIMIYETI.md                    # Java'dan gelen biri için kod gezisi (dosya dosya)
 ├── MIMARI.drawio                        # Aynı mimarinin draw.io çizimi
 └── README.md                            # (bu dosya)
+
+Kurulum rehberleri (fullservice-backend/ altında):
+- KURULUM_SAHA_4_MAKINE.md   → gerçek saha: 4 ayrı fiziksel makine
+- KURULUM_VM_LAB_TEK_MAC.md  → tek Mac üzerinde VM lab (hızlı deneme)
 ```
 
 ---
@@ -38,16 +43,22 @@ fullservice_automation/
                               │ (kablo + Wi-Fi linkleri aynı modeme)
    ┌──────────────────────────┼───────────────────────────┐
    │                          │                            │
-┌──┴────────┐   ┌─────────────┴──┐   ┌────────────────────┐   ┌──────────────┐
-│ LINUX SUN.│   │ MAC (kablo)    │   │ WINDOWS (Wi-Fi)    │   │ MAC (Wi-Fi)  │
-│ orkestr.  │   │ listener:7531  │   │ listener:7531      │   │ listener:7531│
-│ +iperf3 -s│   │ ping/yt/iperf  │   │ ping/yt/torrent/wt │   │ ping/yt/iperf│
-└───────────┘   └────────────────┘   └────────────────────┘   └──────────────┘
-       │  HTTP (/api/register, /progress, /logs/upload, /session/start, /health-check)
-       │  (4 düğüm hep birlikte koşar → modeme stres)
+┌──┴────────┐   ┌─────────────────┐   ┌────────────────────┐   ┌───────────────┐
+│ LINUX SUN.│   │ MAC (kablo)     │   │ WINDOWS (Wi-Fi)    │   │ MAC (Wi-Fi)   │
+│ orkestr.  │   │ listener:7531   │   │ listener:7531      │   │ listener:7531 │
+│ ping/yt   │   │ ping/yt/        │   │ ping/yt/torrent/wt │   │ ping/yt/wt/   │
+│ dashboard │   │ iperf3 -s (SRV) │◄──│                    │   │ iperf -c (CLI)│
+└───────────┘   └─────────────────┘   └────────────────────┘   └──────┬────────┘
+       │  HTTP (/api/register, /progress, /logs/upload,            iperf │ (Wi-Fi Mac
+       │        /session/start, /session/reset, /health-check)           │  → kablolu
+       │  (4 düğüm hep birlikte koşar → modeme stres)                    │  Mac'e yük)
        └─ Dashboard (Vue 3) tarayıcıdan açılır → 4 düğümü canlı izler
-          + sağ panelde aşamalı Health-Check (kırmızı/yeşil ışıklar)
+          + sağ panelde aşamalı Health-Check + üstte "Sıfırla" butonu
 ```
+
+> **iperf topolojisi:** Linux sunucu artık iperf server DEĞİL. **Kablolu Mac**
+> `iperf3 -s` (server), **Wi-Fi Mac** client olur; trafik iki Mac arasında modem
+> üzerinden akar.
 
 **Statik IP & listener:** Her makineye yerel statik IP atanır ve listener (agent)
 boot'ta otomatik başlar. Bunun için `fullservice-backend/provisioning/` altındaki
@@ -90,9 +101,10 @@ npm run build                       # → dist/
 # Backend dist'i otomatik servis eder; doğrudan http://<lan_ip>:8770'e bağlan.
 ```
 
-Lab kurulumu (UTM ile VM'ler), **statik IP atama** ve **boot listener** için:
-[`fullservice-backend/KURULUM_TEST.md`](fullservice-backend/KURULUM_TEST.md) ·
-[`fullservice-backend/provisioning/README.md`](fullservice-backend/provisioning/README.md)
+Kurulum rehberleri (**statik IP**, **boot listener**, ön koşullar):
+- Saha (4 fiziksel makine): [`fullservice-backend/KURULUM_SAHA_4_MAKINE.md`](fullservice-backend/KURULUM_SAHA_4_MAKINE.md)
+- Tek Mac VM lab: [`fullservice-backend/KURULUM_VM_LAB_TEK_MAC.md`](fullservice-backend/KURULUM_VM_LAB_TEK_MAC.md)
+- Provisioning scriptleri: [`fullservice-backend/provisioning/README.md`](fullservice-backend/provisioning/README.md)
 
 ---
 
@@ -108,20 +120,26 @@ GRK'nın **Günlük Rutin Kontrol** sekmesi örnek alınarak:
   `1sn×3 → 3sn×3 → 5sn×3 → 15sn×1 → 30sn×1 → sürekli 60sn` (program kapanana dek).
   Her düğüm için kırmızı/yeşil ışık + gecikme (ms).
 - **Canlı test ilerlemesi:** Her düğümün her testinin ilerleme yüzdesi 1 sn'de bir
-  güncellenir (mevcut davranış korunur).
+  güncellenir; düğüm kartları orta sütunda **2×2** dizilir, sol kartta **oturum &
+  ilerleme özeti** görünür.
+- **Sıfırla butonu (üst bar):** Onay sorduktan sonra her şeyi başa alır — testleri
+  durdurur, ilerleme/oturum ve Health-Check'i sıfırlar (`POST /api/session/reset`).
+- **Tema:** Türk Telekom mavisi; sol açılır menüde Panel / Ayarlar / Profil (son ikisi
+  şimdilik yer tutucu).
 
 ---
 
 ## Test Türleri (4 düğüme dağıtılmış)
 
-| Test            | Ne yapar                                                       | Hangi düğümler   |
-|-----------------|----------------------------------------------------------------|------------------|
-| `ping_modem`    | Modeme sürekli ping atar — yerel ağı sağlar                     | hepsi            |
-| `ping_internet` | 8.8.8.8 vb. internete ping — WAN sağlar                        | hepsi            |
-| `youtube`       | Tarayıcıda HD video oynatır — sürekli bant kullanır            | sunucu + 3 client|
-| `iperf`         | iperf3 ile hattı doldurur → maksimum throughput                | 2 Mac            |
-| `torrent`       | qBittorrent ile çoklu peer yükü (Faz 4: simülasyon)            | Windows          |
-| `wifi_track`    | Wi-Fi sinyal/kanal/throughput takibi (Faz 4: simülasyon)       | 2 kablosuz       |
+| Test            | Ne yapar                                                                 | Hangi düğümler   |
+|-----------------|--------------------------------------------------------------------------|------------------|
+| `ping_modem`    | Modeme ping — **görünür terminalde canlı**                               | hepsi            |
+| `ping_internet` | 8.8.8.8'e ping — **görünür terminalde canlı**                            | hepsi            |
+| `youtube`       | Tarayıcıda **en yüksek kalitede** video (Selenium/Chrome zorlar)         | sunucu + 3 client|
+| `iperf_server`  | `iperf3 -s` dinler (kablolu Mac)                                          | mac_cable        |
+| `iperf`         | `iperf3 -c` ile kablolu Mac'e yük basar                                   | mac_wifi         |
+| `torrent`       | **qBittorrent** ile GTA5 magnet indirme döngüsü (gerçek)                  | Windows          |
+| `wifi_track`    | Wi-Fi sinyal/kanal/rx-tx + sistem kaynağı takibi — **canlı terminal**    | 2 kablosuz       |
 
 ---
 
@@ -132,8 +150,10 @@ GRK'nın **Günlük Rutin Kontrol** sekmesi örnek alınarak:
 | 1–3 | İskelet + protokol + agent + sunucu + dashboard                         | ✅    |
 | —   | Marka/Model/Firmware DB combobox + aşamalı Health-Check paneli          | ✅    |
 | —   | Statik IP + boot listener paketleme (`provisioning/`)                   | ✅    |
-| 4   | torrent + wifi_track gerçek; iperf çoklu port                           | 🟡    |
-| 5   | Oturum bitince **FTPS + PostgreSQL + mail/Telegram**                    | ⏳    |
+| —   | Mavi tema, sol menü, 2×2 kart, Sıfırla butonu, oturum/ilerleme özeti    | ✅    |
+| 4   | torrent (qBittorrent) + wifi_track **gerçek**; ping/wifi **canlı terminal**; YouTube en yüksek kalite | ✅ |
+| —   | iperf topoloji (kablolu Mac server / Wi-Fi Mac client) — bağlantı düzeltmesi sürüyor | 🟡 |
+| 5   | Loglar **bilgisayar klasörlerine** (LINUX/MAC_ETH/MAC_WIFI/WIN_WIFI) ✅; **FTPS + PostgreSQL + mail/Telegram** | ⏳ |
 | 6   | Tek-tıklık installer paketleme                                          | ⏳    |
 
 ---

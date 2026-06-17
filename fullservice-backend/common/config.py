@@ -113,6 +113,7 @@ _FALLBACK = {
         "iperf_port": 5201,
         "iperf_parallel": 4,
         "torrent_magnet": "",
+        "torrent_recycle_gb": 5,
         "duration": 60,
     },
     "nodes": [

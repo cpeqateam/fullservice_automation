@@ -38,23 +38,20 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     # 1) Selenium ile EN YÜKSEK kaliteye zorla (Chrome + selenium gerekir)
     try:
         from common.runners import youtube_util
-        result = youtube_util.force_play_max(link)
-        if result.get("quality_set"):
-            ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube EN YÜKSEK kalitede oynatılıyor")
-        else:
-            ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (kalite menüsü ayarlanamadı)")
+        youtube_util.force_play_max(link)
+        ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor")
         return [log_file]
     except Exception as e:
         print(f"[YOUTUBE] Selenium ile acilamadi ({e}); tarayiciya fallback.")
         with open(log_file, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"Selenium fallback sebebi: {e}\n")
 
-    # 2) Fallback: varsayılan tarayıcıda aç (kalite yalnızca URL ipucu)
+    # 2) Fallback: varsayılan tarayıcıda aç
     try:
         webbrowser.open(quality_link)
     except Exception as e:
         ctx.progress(100.0, TestStatus.ERROR.value, f"YouTube açılamadı: {e}")
         return [log_file]
 
-    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (Selenium yok — kalite ipucu)")
+    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor")
     return [log_file]
