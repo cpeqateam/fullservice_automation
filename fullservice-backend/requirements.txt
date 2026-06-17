@@ -8,6 +8,11 @@ python-multipart
 # Wi-Fi track (CPU/RAM/pil) ve torrent (qBittorrent süreç kontrolü) için
 psutil
 
+# YouTube'u EN YÜKSEK kaliteye zorlama (oynatıcı kalite menüsünü Selenium tıklatır).
+# Selenium 4.6+ chromedriver'ı otomatik indirir; makinede Chrome/Chromium kurulu olmalı.
+# Kurulu degilse YouTube basit tarayici acmaya geri duser (sistem yine calisir).
+selenium
+
 # Marka/Model/Firmware combobox'ları için firmware DB (cpeqadb, PostgreSQL/SSL).
 # Bağlantı kurulamazsa sistem yine çalışır; alanlar serbest-metin girişine düşer.
 sqlalchemy

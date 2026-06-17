@@ -14,7 +14,9 @@ Sözleşme:
 import os
 import platform
 import shlex
+import stat
 import subprocess
+import tempfile
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -74,8 +76,22 @@ def _osascript_terminal(command: str):
     return subprocess.Popen(["osascript", "-e", script])
 
 
+def _write_launch_script(inner_cmd: str, title: str) -> str:
+    """Komutu geçici bir .sh dosyasına yazar (tırnak/`-e` ayrıştırma sorunlarını
+    tamamen aşmak için). Terminal sadece `bash <script>` çalıştırır."""
+    fd, path = tempfile.mkstemp(prefix="fs_term_", suffix=".sh")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("#!/bin/bash\n")
+        f.write(f"printf '\\033]0;{title}\\007'\n")   # pencere başlığı
+        f.write(f"{inner_cmd}\n")
+        f.write("echo; echo '[bitti — kapatmak için pencereyi kapatın]'\n")
+        f.write("exec bash\n")
+    os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IRUSR)
+    return path
+
+
 def _linux_terminal(inner_cmd: str, title: str):
-    """İlk bulunan Linux terminal emülatöründe bash komutunu çalıştırır.
+    """Bir Linux terminal emülatöründe komutu çalıştırır (script dosyası üzerinden).
 
     Görünür pencere için grafik oturum (DISPLAY/WAYLAND) gerekir. Sunucu systemd
     ile veya SSH'tan çalışıyorsa DISPLAY olmaz → pencere açılmaz (None döner).
@@ -85,27 +101,32 @@ def _linux_terminal(inner_cmd: str, title: str):
               "Sunucuyu masaustundeki Terminal'den 'python run_server.py' ile baslatin.")
         return None
 
-    keep = f"{inner_cmd}; echo; echo '[bitti — kapatmak için pencereyi kapatın]'; exec bash"
+    script = _write_launch_script(inner_cmd, title)
+    # Hepsi script'i AYRI argüman olarak alır (tek-string -e tuzağı yok).
     candidates = [
-        ["gnome-terminal", "--title", title, "--", "bash", "-c", keep],
-        ["xfce4-terminal", "--title", title, "-e", f"bash -c {shlex.quote(keep)}"],
-        ["konsole", "-p", f"tabtitle={title}", "-e", f"bash -c {shlex.quote(keep)}"],
-        ["mate-terminal", "--title", title, "-e", f"bash -c {shlex.quote(keep)}"],
-        ["xterm", "-T", title, "-e", f"bash -c {shlex.quote(keep)}"],
-        ["x-terminal-emulator", "-e", f"bash -c {shlex.quote(keep)}"],
+        ["gnome-terminal", "--", "bash", script],
+        ["xfce4-terminal", "-x", "bash", script],
+        ["mate-terminal", "-x", "bash", script],
+        ["konsole", "-e", "bash", script],
+        ["xterm", "-e", "bash", script],
+        ["x-terminal-emulator", "-e", "bash", script],
     ]
-    last_err = None
     for term in candidates:
+        if not _which(term[0]):
+            continue
         try:
             return subprocess.Popen(term)
-        except FileNotFoundError:
-            continue
         except Exception as e:
-            last_err = e
+            print(f"[TERM] {term[0]} acilamadi: {e}")
             continue
-    print(f"[TERM] Hicbir terminal emulatoru acilamadi (gnome-terminal/xterm yok mu?). "
-          f"Kur: sudo apt install gnome-terminal  | son hata: {last_err}")
+    print("[TERM] Terminal emulatoru bulunamadi. Kur: sudo apt install gnome-terminal")
     return None
+
+
+def _which(name: str) -> bool:
+    """PATH'te yürütülebilir var mı (shutil.which sarmalayıcı)."""
+    import shutil
+    return shutil.which(name) is not None
 
 
 def open_terminal_running(argv, title: str = "FULL Servis"):
@@ -113,7 +134,10 @@ def open_terminal_running(argv, title: str = "FULL Servis"):
     Açılamazsa None döner — test arka planda normal devam eder."""
     try:
         if is_windows():
-            return subprocess.Popen(list(argv), creationflags=CREATE_NEW_CONSOLE)
+            # Yeni GÖRÜNÜR cmd penceresi; komut bitince pencere AÇIK kalsın (/k) —
+            # macOS Terminal davranışıyla aynı.
+            return subprocess.Popen(["cmd", "/k"] + [str(a) for a in argv],
+                                    creationflags=CREATE_NEW_CONSOLE)
         inner = " ".join(shlex.quote(str(a)) for a in argv)
         if is_mac():
             return _osascript_terminal(f"{inner} ; echo ; echo [bitti]")

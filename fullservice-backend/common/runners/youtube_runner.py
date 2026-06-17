@@ -23,23 +23,38 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         ctx.progress(100.0, TestStatus.ERROR.value, "YouTube linki boş.")
         return []
 
-    # 1080p zorlama (GRK ile aynı): &vq=hd1080 / ?vq=hd1080
+    # URL ipucu (Selenium başarısız olursa fallback için): vq=hd2160 + hd=1
     quality_link = link
     if "youtu" in quality_link:
         sep = "&" if "?" in quality_link else "?"
-        quality_link = f"{quality_link}{sep}vq=hd1080"
+        quality_link = f"{quality_link}{sep}vq=hd2160&hd=1"
 
     with open(log_file, "w", encoding="utf-8", errors="replace") as f:
         f.write(f"FULL Servis YouTube — Node: {ctx.node_id}\n")
-        f.write(f"Link: {quality_link}\nAcilis: {datetime.now()}\n")
+        f.write(f"Link: {link}\nAcilis: {datetime.now()}\n")
 
-    ctx.progress(0.0, TestStatus.RUNNING.value, "YouTube açılıyor...")
+    ctx.progress(0.0, TestStatus.RUNNING.value, "YouTube açılıyor (en yüksek kalite)...")
+
+    # 1) Selenium ile EN YÜKSEK kaliteye zorla (Chrome + selenium gerekir)
+    try:
+        from common.runners import youtube_util
+        result = youtube_util.force_play_max(link)
+        if result.get("quality_set"):
+            ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube EN YÜKSEK kalitede oynatılıyor")
+        else:
+            ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (kalite menüsü ayarlanamadı)")
+        return [log_file]
+    except Exception as e:
+        print(f"[YOUTUBE] Selenium ile acilamadi ({e}); tarayiciya fallback.")
+        with open(log_file, "a", encoding="utf-8", errors="replace") as f:
+            f.write(f"Selenium fallback sebebi: {e}\n")
+
+    # 2) Fallback: varsayılan tarayıcıda aç (kalite yalnızca URL ipucu)
     try:
         webbrowser.open(quality_link)
     except Exception as e:
         ctx.progress(100.0, TestStatus.ERROR.value, f"YouTube açılamadı: {e}")
         return [log_file]
 
-    # Tek bildirim — ilerleme takip edilmez (kapatana kadar açık kalır).
-    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor")
+    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (Selenium yok — kalite ipucu)")
     return [log_file]
