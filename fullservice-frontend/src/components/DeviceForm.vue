@@ -7,19 +7,19 @@
       <h2 class="text-h6 font-weight-bold mb-0">Cihaz ve Test Bilgileri</h2>
     </div>
 
-    <!-- DB bağlantı hatası uyarısı -->
+    <!-- DB bağlantı hatası uyarısı (tek satır) -->
     <v-alert
       v-if="appStore.brandsDbFailed || appStore.firmwareDbFailed"
       type="warning"
       variant="tonal"
       density="compact"
       icon="mdi-database-alert"
-      class="mb-4"
+      class="mb-4 db-warn"
     >
-      DB bağlantısı kurulamadı. Marka/Model/Firmware alanları geçici olarak serbest metin girişine açıldı.
+      DB yok — alanlar serbest metne açıldı.
     </v-alert>
 
-    <v-form @submit.prevent="onStart">
+    <v-form @submit.prevent="onStart" class="form-body d-flex flex-column flex-grow-1">
       <!-- Marka -->
       <div class="field-row">
         <label class="field-label">Marka</label>
@@ -105,19 +105,47 @@
         />
       </div>
 
-      <!-- Gelişmiş parametreler (opsiyonel) -->
-      <v-expansion-panels variant="accordion" class="adv-panel mt-2">
-        <v-expansion-panel>
-          <v-expansion-panel-title class="text-caption">Gelişmiş parametreler (opsiyonel)</v-expansion-panel-title>
-          <v-expansion-panel-text>
-            <v-text-field v-model="appStore.overrides.modem_ip" label="Modem IP" placeholder="varsayılan" variant="outlined" density="compact" hide-details class="mb-3" />
-            <v-text-field v-model="appStore.overrides.internet_ip" label="İnternet IP" placeholder="varsayılan" variant="outlined" density="compact" hide-details class="mb-3" />
-            <v-text-field v-model="appStore.overrides.youtube_link" label="YouTube linki" placeholder="varsayılan" variant="outlined" density="compact" hide-details />
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
+      <!-- Oturum & ilerleme özeti — boş alanı canlı bilgiyle doldurur -->
+      <div class="summary mt-5">
+        <div class="summary-head">
+          <span class="summary-title">OTURUM DURUMU</span>
+          <v-chip size="x-small" :color="statusChip.color" variant="flat" class="font-weight-bold">
+            {{ statusChip.label }}
+          </v-chip>
+        </div>
 
-      <div class="d-flex gap-3 mt-6">
+        <div class="summary-row">
+          <span class="sr-key">Cihaz</span>
+          <span class="sr-val">{{ deviceLabel }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="sr-key">Süre</span>
+          <span class="sr-val">{{ appStore.overrides.duration || 'varsayılan' }} sn</span>
+        </div>
+        <div class="summary-row">
+          <span class="sr-key">Oturum</span>
+          <span class="sr-val mono">{{ appStore.session.session_id || '—' }}</span>
+        </div>
+
+        <div class="summary-row mt-3">
+          <span class="sr-key">Genel ilerleme</span>
+          <span class="sr-val">%{{ appStore.testSummary.avg }}</span>
+        </div>
+        <v-progress-linear
+          :model-value="appStore.testSummary.avg"
+          color="primary" height="8" rounded class="mt-1"
+        />
+
+        <div class="counts mt-3">
+          <span class="count"><span class="dot running" /> {{ appStore.testSummary.running }} çalışıyor</span>
+          <span class="count"><span class="dot done" /> {{ appStore.testSummary.completed }} bitti</span>
+          <span class="count"><span class="dot err" /> {{ appStore.testSummary.error }} hata</span>
+          <v-spacer />
+          <span class="count total">{{ appStore.testSummary.completed }}/{{ appStore.testSummary.total }}</span>
+        </div>
+      </div>
+
+      <div class="d-flex action-buttons mt-auto pt-6">
         <v-btn
           color="primary"
           size="large"
@@ -151,12 +179,27 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useAppStore } from '@/store/app'
 
 const appStore = useAppStore()
 const starting = ref(false)
 const snack = reactive({ show: false, text: '', color: 'info' })
+
+// Oturum durumu rozeti (HAZIR / ÇALIŞIYOR / TAMAMLANDI)
+const statusChip = computed(() => {
+  if (appStore.session.running) return { label: 'ÇALIŞIYOR', color: 'warning' }
+  if (appStore.session.session_id) return { label: 'TAMAMLANDI', color: 'success' }
+  return { label: 'HAZIR', color: 'grey' }
+})
+
+// Seçilen cihaz özeti (marka model · firmware)
+const deviceLabel = computed(() => {
+  const d = appStore.deviceInfo
+  const base = [d.brand, d.model].filter(Boolean).join(' ')
+  if (!base) return 'Seçilmedi'
+  return d.firmware ? `${base} · ${d.firmware}` : base
+})
 
 async function onStart() {
   // 1. koşul: önce sağ paneldeki Health-Check başlatılmış olmalı.
@@ -209,15 +252,54 @@ async function onStop() {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .field-row {
-  display: flex; align-items: center; gap: 16px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 16px; margin-bottom: 10px;
 }
 .field-label {
   width: 90px; flex-shrink: 0;
   font-size: 14px; font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
+  /* Tema duyarlı: koyu temada açık, açık temada koyu (Vuetify değişkeni) */
+  color: rgba(var(--v-theme-on-surface), 0.6);
 }
-.adv-panel :deep(.v-expansion-panel) {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border-radius: 12px;
+.db-warn :deep(.v-alert__content) { white-space: nowrap; font-size: 12px; }
+
+/* Oturum & ilerleme özeti */
+.summary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 14px 16px;
 }
+.summary-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.summary-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; opacity: 0.6;
+}
+.summary-row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; padding: 3px 0;
+}
+.sr-key { opacity: 0.55; }
+.sr-val {
+  font-weight: 600; max-width: 60%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sr-val.mono { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; opacity: 0.8; }
+
+.counts {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 11.5px; opacity: 0.85;
+}
+.count { display: flex; align-items: center; gap: 5px; }
+.count.total { font-weight: 700; opacity: 1; }
+.dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  &.running { background: #FF9F0A; box-shadow: 0 0 6px rgba(255,159,10,0.6); }
+  &.done    { background: #30D158; }
+  &.err     { background: #FF453A; }
+}
+
+/* Başlat / Durdur butonları arası boşluk (eskiden bitişikti) */
+.action-buttons { gap: 18px; }
 </style>

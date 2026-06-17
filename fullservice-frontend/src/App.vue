@@ -4,29 +4,74 @@
 
     <Topbar />
 
+    <!-- Sol gezinme çekmecesi (hamburger ile açılır) -->
+    <v-navigation-drawer v-model="appStore.drawerOpen" temporary width="270" class="nav-drawer">
+      <div class="nav-head d-flex align-center px-4 py-4">
+        <v-icon color="primary" size="22" class="mr-2">mdi-view-grid-outline</v-icon>
+        <span class="nav-title">MENÜ</span>
+      </div>
+      <v-divider class="border-opacity-15" />
+      <v-list nav density="comfortable" class="pa-2">
+        <v-list-item
+          :active="appStore.currentView === 'dashboard'"
+          prepend-icon="mdi-view-dashboard-outline"
+          title="Panel"
+          rounded="lg"
+          @click="appStore.setView('dashboard')"
+        />
+        <v-list-item
+          :active="appStore.currentView === 'settings'"
+          prepend-icon="mdi-cog-outline"
+          title="Ayarlar"
+          rounded="lg"
+          @click="appStore.setView('settings')"
+        />
+        <v-list-item
+          :active="appStore.currentView === 'profile'"
+          prepend-icon="mdi-account-circle-outline"
+          title="Profil"
+          rounded="lg"
+          @click="appStore.setView('profile')"
+        />
+      </v-list>
+    </v-navigation-drawer>
+
     <v-main>
       <v-container fluid class="py-6">
-        <v-row>
-          <!-- Ana içerik: cihaz formu + canlı test izleme -->
-          <v-col cols="12" lg="9">
-            <!-- Cihaz/test formu dar tutulur; alttaki ilerleme kartları tam genişlikte kalır -->
-            <div class="form-wrap mb-5">
-              <DeviceForm />
-            </div>
+        <!-- ── PANEL (dashboard) ── -->
+        <v-row v-if="appStore.currentView === 'dashboard'">
+          <!-- Sol: cihaz/test formu — tam yükseklik -->
+          <v-col cols="12" md="4" lg="3">
+            <DeviceForm class="fill-col" />
+          </v-col>
 
+          <!-- Orta: 2×2 düğüm kartları -->
+          <v-col cols="12" md="5" lg="6">
             <div v-if="!appStore.nodes.length" class="empty">
               <v-progress-circular indeterminate color="primary" size="48" />
               <p class="mt-4 text-body-2 text-medium-emphasis">Sunucuya bağlanılıyor…</p>
             </div>
-
-            <div v-else class="node-grid">
+            <div v-else class="node-grid-2x2">
               <NodeCard v-for="n in appStore.nodes" :key="n.node_id" :node="n" :labels="appStore.testLabels" />
             </div>
           </v-col>
 
           <!-- Sağ panel: health-check + bağlantı ışıkları -->
-          <v-col cols="12" lg="3">
+          <v-col cols="12" md="3" lg="3">
             <StatusPanel />
+          </v-col>
+        </v-row>
+
+        <!-- ── AYARLAR / PROFİL (şimdilik boş yer tutucu) ── -->
+        <v-row v-else justify="center">
+          <v-col cols="12" md="8" lg="6">
+            <v-card class="placeholder-card pa-10 text-center" rounded="xl" elevation="0">
+              <v-icon :icon="viewMeta.icon" size="56" color="primary" class="mb-4" />
+              <h2 class="text-h5 font-weight-bold mb-2">{{ viewMeta.title }}</h2>
+              <p class="text-body-2 text-medium-emphasis">
+                Bu bölüm yakında eklenecek.
+              </p>
+            </v-card>
           </v-col>
         </v-row>
       </v-container>
@@ -42,7 +87,7 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useAppStore } from '@/store/app'
 import LiquidBackground from '@/components/LiquidBackground.vue'
 import Topbar from '@/components/Topbar.vue'
@@ -51,6 +96,13 @@ import StatusPanel from '@/components/StatusPanel.vue'
 import NodeCard from '@/components/NodeCard.vue'
 
 const appStore = useAppStore()
+
+// Ayarlar/Profil placeholder başlık + ikonu
+const viewMeta = computed(() => {
+  if (appStore.currentView === 'settings') return { title: 'Ayarlar', icon: 'mdi-cog-outline' }
+  if (appStore.currentView === 'profile') return { title: 'Profil', icon: 'mdi-account-circle-outline' }
+  return { title: '', icon: '' }
+})
 
 onMounted(() => {
   appStore.startPolling(1000)
@@ -64,14 +116,61 @@ onBeforeUnmount(() => {
 
 <style>
 .app-root .v-application__wrap { background: transparent !important; }
-/* Cihaz/test formu kartı dar tutulur — eskiden tüm kolonu kaplıyordu */
-.form-wrap { max-width: 600px; }
 .empty { display: flex; flex-direction: column; align-items: center; padding: 80px 0; }
-.node-grid {
+
+/* Orta sütun: 4 düğüm kartı 2×2 (2 üst, 2 alt) */
+.node-grid-2x2 {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
 }
+/* md+ ekranlarda: ekran yüksekliğine sığsın, taşarsa kendi içinde kayar
+   (monitörde uzun, laptopta kısa → vh ile otomatik uyum) */
+@media (min-width: 960px) {
+  .node-grid-2x2 {
+    max-height: calc(100vh - 176px);
+    overflow-y: auto;
+    align-content: start;
+    padding-right: 4px;
+  }
+}
+@media (max-width: 600px) {
+  .node-grid-2x2 { grid-template-columns: 1fr; }
+}
+
+/* Sol form kartı kolonu doldursun (md+ ekranda ekrana sığsın) */
+.fill-col.device-form {
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 960px) {
+  .fill-col.device-form { height: calc(100vh - 176px); }
+}
+
+/* Sol gezinme çekmecesi — tema duyarlı (açık temada beyaz, koyuda koyu) */
+.v-theme--dark .nav-drawer {
+  background: rgba(18, 24, 34, 0.92) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.v-theme--light .nav-drawer {
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+.nav-head .nav-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; opacity: 0.85;
+}
+
+/* Ayarlar / Profil boş yer tutucu kartı */
+.placeholder-card {
+  background: rgba(20, 26, 36, 0.55) !important;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 40px;
+}
+
 .foot {
   background: rgba(0,0,0,0.3) !important;
   backdrop-filter: blur(20px);

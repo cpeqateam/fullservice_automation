@@ -159,11 +159,13 @@ function onHealthCheck() {
   -webkit-backdrop-filter: blur(28px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   position: sticky;
-  top: 88px;
-  // Paneli ekranın altına kadar uzat: yarım kalmasın.
-  min-height: calc(100vh - 122px);
+  top: 104px;
+  // Ekran yüksekliğine sığar (monitör/laptop'a göre vh ile uyum); içerik taşarsa
+  // gövde kendi içinde kayar, Health-Check butonu HEP altta görünür kalır.
+  height: calc(100vh - 176px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .sp-header .sp-title {
   font-size: 12px; font-weight: 700; letter-spacing: 0.08em;

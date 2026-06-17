@@ -38,6 +38,10 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     isDarkMode: localStorage.getItem('fs_theme') !== 'light',
 
+    // Arayüz gezinmesi (sol çekmece + aktif görünüm)
+    drawerOpen: false,
+    currentView: 'dashboard',   // 'dashboard' | 'settings' | 'profile'
+
     // Backend'den gelen birleşik durum (orchestrator.get_state)
     session:     { session_id: null, running: false, started_at: null, ended_at: null, params: {}, device: {} },
     nodes:       [],
@@ -76,6 +80,22 @@ export const useAppStore = defineStore('app', {
     modelOptions:  (s) => {
       const b = s.brandsData.find((x) => x.title === s.deviceInfo.brand)
       return b ? b.models : []
+    },
+    // Tüm düğümlerin testleri üzerinden birleşik ilerleme özeti (sol kart için)
+    testSummary: (s) => {
+      let total = 0, completed = 0, running = 0, error = 0, sum = 0
+      for (const n of s.nodes) {
+        for (const r of (n.roles || [])) {
+          const t = n.tests?.[r]
+          if (!t) continue
+          total += 1
+          sum += t.progress || 0
+          if (t.status === 'completed') completed += 1
+          else if (t.status === 'running') running += 1
+          else if (t.status === 'error') error += 1
+        }
+      }
+      return { total, completed, running, error, avg: total ? Math.round(sum / total) : 0 }
     },
   },
 
@@ -233,6 +253,15 @@ export const useAppStore = defineStore('app', {
     toggleTheme() {
       this.isDarkMode = !this.isDarkMode
       localStorage.setItem('fs_theme', this.isDarkMode ? 'dark' : 'light')
+    },
+
+    // ── Arayüz gezinmesi ─────────────────────────────────────
+    toggleDrawer() {
+      this.drawerOpen = !this.drawerOpen
+    },
+    setView(view) {
+      this.currentView = view
+      this.drawerOpen = false   // seçim sonrası çekmeceyi kapat
     },
   },
 })
