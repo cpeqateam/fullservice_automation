@@ -1,15 +1,21 @@
 """
 Ping testi çalıştırıcı — modeme veya internete cross-platform ping atar.
 
-GRK ping_service'ten uyarlanmıştır; tek hedef + canlı ilerleme + temiz durdurma
-ekler. ping_internet ve ping_modem aynı motoru farklı hedefle kullanır.
+GRK ping_service'ten uyarlanmıştır. Kullanıcı isteri: ping atılırken komut satırı
+çıktısı CANLI görünsün. Bu yüzden:
+  • Arka planda bir ping çalışır → log dosyasına yazar (özet + kayıt + durdurma kontrolü).
+  • Ayrıca GÖRÜNÜR bir terminal penceresinde aynı ping çalışır → kullanıcı canlı izler.
+Görünür pencere yalnızca masaüstü oturumunda açılır; açılamazsa test arka planda
+normal devam eder. ping_internet ve ping_modem aynı motoru farklı hedefle kullanır.
 """
 import subprocess
 import time
 from datetime import datetime
 
 from common.protocol import TestParams, TestStatus
-from common.runners.base import RunContext, NO_WINDOW, is_windows
+from common.runners.base import (
+    RunContext, NO_WINDOW, is_windows, open_terminal_running, close_terminal,
+)
 
 
 def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> list[str]:
@@ -27,6 +33,9 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
     log_file = ctx.log_path(f"ping_{label}_{target}")
     ctx.progress(0.0, TestStatus.RUNNING.value, f"{label} başlıyor → {target}")
 
+    # Canlı izleme için görünür terminal (best-effort, masaüstü oturumu gerekir)
+    viewer = open_terminal_running(cmd, f"PING {label} → {target} [{ctx.node_id}]")
+
     try:
         with open(log_file, "w", encoding="utf-8", errors="replace") as f:
             f.write(f"FULL Servis Ping — {label}\n")
@@ -42,6 +51,7 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
             for i in range(count):
                 if ctx.stop.is_set():
                     proc.terminate()
+                    close_terminal(viewer)
                     f.write(f"\n-- Kullanici durdurdu: {datetime.now()} --\n")
                     ctx.progress((i / count) * 100, TestStatus.STOPPED.value, f"{label} durduruldu")
                     return [log_file]
@@ -62,6 +72,8 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
     except Exception as e:
         ctx.progress(100.0, TestStatus.ERROR.value, f"{label} hatası: {e}")
         return [log_file]
+    finally:
+        close_terminal(viewer)
 
 
 def run_internet(params: TestParams, ctx: RunContext) -> list[str]:

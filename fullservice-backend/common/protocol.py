@@ -67,6 +67,7 @@ class TestParams(BaseModel):
     iperf_server: str = ""     # Client Mac buraya bağlanır = iperf server rolündeki (kablolu) Mac'in LAN IP'si
     iperf_port: int = 5201
     iperf_parallel: int = 4
+    torrent_magnet: str = ""   # Windows torrent testi için magnet link (qBittorrent'e eklenir)
     duration: int = 60         # saniye (ping paket sayısı / test süresi)
     extra: Dict[str, Any] = {}
 

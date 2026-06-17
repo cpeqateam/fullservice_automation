@@ -20,7 +20,7 @@ from datetime import datetime
 
 import requests
 
-from common.config import LOGS_DIR, detect_lan_ip
+from common.config import LOGS_DIR, detect_lan_ip, node_log_folder
 from common.protocol import TestParams, TestStatus, TEST_LABELS
 from common.runners.base import RunContext
 from common.runners.registry import get_runner
@@ -162,6 +162,7 @@ class Orchestrator:
                 iperf_server=self._iperf_server_ip(),
                 iperf_port=int(self.defaults.get("iperf_port", 5201)),
                 iperf_parallel=int(self.defaults.get("iperf_parallel", 4)),
+                torrent_magnet=overrides.get("torrent_magnet") or self.defaults.get("torrent_magnet", ""),
                 duration=int(overrides.get("duration") or self.defaults.get("duration", 60)),
             )
             self.session = {
@@ -238,7 +239,8 @@ class Orchestrator:
 
     def _run_server_local(self, session_id: str, roles: list, params: TestParams):
         """Sunucunun kendi rollerini in-process thread'lerde koşar."""
-        log_dir = os.path.join(LOGS_DIR, session_id, "server")
+        # Sunucunun kendi logları da bilgisayar klasörü altına (logs/LINUX/<session>)
+        log_dir = os.path.join(LOGS_DIR, node_log_folder("server", self.config), session_id)
         for test in roles:
             runner = get_runner(test)
             if runner is None:

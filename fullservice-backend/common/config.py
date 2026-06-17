@@ -60,6 +60,21 @@ def get_node(config: dict, node_id: str) -> dict | None:
     return None
 
 
+def node_log_folder(node_id: str, config: dict | None = None) -> str:
+    """
+    Bir düğümün, Linux sunucudaki log klasör adını döner (config'deki `log_name`;
+    yoksa node_id'nin büyük harfli hali). Sunucuda loglar şu yapıya yazılır:
+        logs/<log_name>/<session_id>/<dosya>
+    Örn: server→LINUX, mac_cable→MAC_ETH, mac_wifi→MAC_WIFI, win_wifi→WIN_WIFI.
+    """
+    if config is None:
+        config = load_config()
+    node = get_node(config, node_id)
+    if node and node.get("log_name"):
+        return node["log_name"]
+    return (node_id or "UNKNOWN").upper()
+
+
 def detect_lan_ip() -> str:
     """
     Makinenin yerel ağ (LAN) IP'sini tahmin eder. iperf server adresi ve agent'ın
@@ -97,16 +112,21 @@ _FALLBACK = {
         "youtube_link": "https://youtu.be/uXNU0XgGZhs",
         "iperf_port": 5201,
         "iperf_parallel": 4,
+        "torrent_magnet": "",
         "duration": 60,
     },
     "nodes": [
         {"id": "server", "label": "Linux Sunucu (Kablo)", "conn": "cable", "is_server": True,
+         "log_name": "LINUX",
          "roles": ["ping_internet", "ping_modem", "youtube"]},
         {"id": "mac_cable", "label": "MAC (Kablo)", "conn": "cable",
+         "log_name": "MAC_ETH",
          "roles": ["youtube", "ping_modem", "ping_internet", "iperf_server"]},
         {"id": "win_wifi", "label": "WINDOWS (Wi-Fi)", "conn": "wifi",
+         "log_name": "WIN_WIFI",
          "roles": ["youtube", "ping_modem", "ping_internet", "torrent", "wifi_track"]},
         {"id": "mac_wifi", "label": "MAC (Wi-Fi)", "conn": "wifi",
+         "log_name": "MAC_WIFI",
          "roles": ["youtube", "ping_modem", "ping_internet", "iperf", "wifi_track"]},
     ],
 }

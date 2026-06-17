@@ -5,6 +5,9 @@ pydantic
 requests
 python-multipart
 
+# Wi-Fi track (CPU/RAM/pil) ve torrent (qBittorrent süreç kontrolü) için
+psutil
+
 # Marka/Model/Firmware combobox'ları için firmware DB (cpeqadb, PostgreSQL/SSL).
 # Bağlantı kurulamazsa sistem yine çalışır; alanlar serbest-metin girişine düşer.
 sqlalchemy

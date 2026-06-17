@@ -13,6 +13,7 @@ Sözleşme:
 """
 import os
 import platform
+import shlex
 import subprocess
 import threading
 from dataclasses import dataclass, field
@@ -21,6 +22,8 @@ from typing import Callable, Optional
 
 # Windows'ta subprocess çağrılarında siyah CMD penceresi açılmasını engeller (GRK ile aynı yaklaşım)
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+# Windows'ta ayrı/görünür bir konsol penceresi açar (canlı çıktı için)
+CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 
 # İlerleme bildirimi imzası: (yüzde 0..100, status, mesaj)
 ProgressCb = Callable[[float, str, str], None]
@@ -52,3 +55,81 @@ def is_windows() -> bool:
 
 def is_mac() -> bool:
     return platform.system().lower() == "darwin"
+
+
+def is_linux() -> bool:
+    return platform.system().lower() == "linux"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Görünür terminal yardımcıları (kullanıcı isteri: testler başlayınca işlerin
+# canlı aktığı terminal pencereleri açılsın). Bunlar yalnızca GİRİŞ YAPILMIŞ bir
+# masaüstü oturumunda (agent elle/oturumda çalışırken) işe yarar; tamamen
+# arka plan servisinde (Windows SYSTEM görevi, Linux systemd) pencere açılmaz —
+# o durumda sessizce None döner ve test arka planda normal devam eder.
+# ─────────────────────────────────────────────────────────────────────────────
+def _osascript_terminal(command: str):
+    """macOS Terminal.app'te verilen kabuk komutunu yeni pencerede çalıştırır."""
+    script = f'tell application "Terminal" to do script "{command}"'
+    return subprocess.Popen(["osascript", "-e", script])
+
+
+def _linux_terminal(inner_cmd: str, title: str):
+    """İlk bulunan Linux terminal emülatöründe bash komutunu çalıştırır."""
+    keep = f"{inner_cmd}; echo; echo '[bitti — kapatmak için pencereyi kapatın]'; exec bash"
+    candidates = [
+        ["gnome-terminal", "--title", title, "--", "bash", "-c", keep],
+        ["konsole", "-p", f"tabtitle={title}", "-e", f"bash -c {shlex.quote(keep)}"],
+        ["x-terminal-emulator", "-e", f"bash -c {shlex.quote(keep)}"],
+        ["xterm", "-T", title, "-e", f"bash -c {shlex.quote(keep)}"],
+    ]
+    for term in candidates:
+        try:
+            return subprocess.Popen(term)
+        except FileNotFoundError:
+            continue
+    return None
+
+
+def open_terminal_running(argv, title: str = "FULL Servis"):
+    """`argv` komutunu GÖRÜNÜR bir terminal penceresinde çalıştırır (çıktı canlı).
+    Açılamazsa None döner — test arka planda normal devam eder."""
+    try:
+        if is_windows():
+            return subprocess.Popen(list(argv), creationflags=CREATE_NEW_CONSOLE)
+        inner = " ".join(shlex.quote(str(a)) for a in argv)
+        if is_mac():
+            return _osascript_terminal(f"{inner} ; echo ; echo [bitti]")
+        return _linux_terminal(inner, title)
+    except Exception as e:
+        print(f"[TERM] Gorunur terminal acilamadi: {e}")
+        return None
+
+
+def open_log_viewer(log_file: str, title: str = "FULL Servis"):
+    """`log_file`'ı canlı gösteren görünür bir terminal açar (tail -f benzeri).
+    Python tarafı log'a yazdıkça pencerede akar. Açılamazsa None döner."""
+    try:
+        if is_windows():
+            ps = (f"$host.UI.RawUI.WindowTitle='{title}'; "
+                  f"Get-Content -LiteralPath '{log_file}' -Wait -Tail 200")
+            return subprocess.Popen(
+                ["powershell", "-NoExit", "-Command", ps],
+                creationflags=CREATE_NEW_CONSOLE,
+            )
+        tail = f"tail -n 200 -f {shlex.quote(log_file)}"
+        if is_mac():
+            return _osascript_terminal(tail)
+        return _linux_terminal(tail, title)
+    except Exception as e:
+        print(f"[VIEWER] Log izleyici acilamadi: {e}")
+        return None
+
+
+def close_terminal(proc):
+    """Açılan görünür terminali (best-effort) kapatır."""
+    try:
+        if proc and proc.poll() is None:
+            proc.terminate()
+    except Exception:
+        pass

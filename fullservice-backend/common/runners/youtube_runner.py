@@ -1,13 +1,13 @@
 """
-YouTube çalıştırıcı — varsayılan tarayıcıda videoyu açar ve test süresince
-"oynuyor" kabul edip ilerleme bildirir.
+YouTube çalıştırıcı — varsayılan tarayıcıda videoyu açar.
 
-GRK pc_control_service.start_youtube mantığı (1080p zorlama) + süre/durdurma
-takibi eklenmiştir. Tarayıcı sekmesini programatik kapatmak platformlar arası
-güvenilir olmadığından, süre dolunca testi tamamlandı olarak işaretler (sekme
-açık kalır; stres sırasında oynaması istenen davranıştır).
+Kullanıcı isteri: YouTube'un ilerlemesini saniye saniye izlemeye gerek yok. Video
+bir kez açılır ve o makinedeki kişi sekmeyi kapatana kadar açık/oynuyor kalır.
+Bu yüzden runner sadece videoyu açar ve tek bir "oynatılıyor" bildirimi verir
+(geri sayım/ilerleme çubuğu doldurma yok). İlerleme çubuğu %100 dolu görünür.
+
+GRK pc_control_service.start_youtube mantığı (1080p zorlama) korunmuştur.
 """
-import time
 import webbrowser
 from datetime import datetime
 
@@ -40,14 +40,6 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         ctx.progress(100.0, TestStatus.ERROR.value, f"YouTube açılamadı: {e}")
         return [log_file]
 
-    duration = max(1, int(params.duration))
-    for i in range(duration):
-        if ctx.stop.is_set():
-            ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "YouTube durduruldu")
-            return [log_file]
-        time.sleep(1)
-        ctx.progress(((i + 1) / duration) * 100, TestStatus.RUNNING.value,
-                     f"YouTube oynatılıyor {i + 1}/{duration}s")
-
-    ctx.progress(100.0, TestStatus.COMPLETED.value, "YouTube tamamlandı")
+    # Tek bildirim — kapatana kadar açık kalır, ayrıca takip etmiyoruz.
+    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (kapatana kadar açık)")
     return [log_file]
