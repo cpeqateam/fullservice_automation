@@ -279,6 +279,27 @@ class Orchestrator:
                     pass
         return {"status": "stopped"}
 
+    def reset_session(self) -> dict:
+        """
+        Her şeyi programın ilk açıldığı hale döndürür: çalışan testleri durdurur,
+        oturum bilgisini ve tüm düğümlerin test ilerlemelerini sıfırlar. (Bağlantı
+        ışıkları/health-check durumu frontend'de tutulur; o da orada sıfırlanır.)
+        """
+        # Önce çalışanları durdur (agent'lara /stop + sunucu-yerel)
+        try:
+            self.stop_session()
+        except Exception as e:
+            print(f"[ORCH] reset sirasinda stop hatasi: {e}")
+
+        with self._lock:
+            self.session = {"session_id": None, "running": False,
+                            "started_at": None, "ended_at": None, "params": {},
+                            "device": {"brand": None, "model": None, "firmware": None}}
+            for node in self.nodes.values():
+                for r in node["roles"]:
+                    node["tests"][r] = self._blank_test()
+        return {"status": "reset"}
+
     # ── Aktif bağlantı kontrolü (health-check) ───────────────
     def health_check(self) -> dict:
         """

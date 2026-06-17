@@ -14,6 +14,9 @@ export const startSession = (overrides) => api.post('/session/start', overrides)
 
 export const stopSession = () => api.post('/session/stop').then((r) => r.data)
 
+// Her şeyi başa al (testleri durdur + oturum/ilerleme sıfırla)
+export const resetSession = () => api.post('/session/reset').then((r) => r.data)
+
 // Aktif bağlantı kontrolü — her düğümün anlık erişilebilirliği (kırmızı/yeşil)
 export const healthCheck = () => api.get('/health-check').then((r) => r.data)
 

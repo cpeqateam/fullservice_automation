@@ -7,7 +7,7 @@
 //  • testi başlat/durdur eylemlerini sarar.
 import { defineStore } from 'pinia'
 import {
-  fetchState, startSession, stopSession,
+  fetchState, startSession, stopSession, resetSession,
   healthCheck, getBrands, getVersions,
 } from '@/services/api'
 
@@ -188,6 +188,22 @@ export const useAppStore = defineStore('app', {
 
     async stopTest() {
       await stopSession()
+      await this.refresh()
+    },
+
+    // Her şeyi programın ilk açıldığı hale döndür (testler + health-check + form).
+    // Backend ilerlemeleri/oturumu sıfırlar; burada health-check ve form temizlenir.
+    async resetAll() {
+      try {
+        await resetSession()
+      } catch (e) {
+        console.warn('Sıfırlama backend hatası (yine de yerel sıfırlanıyor):', e)
+      }
+      this.stopHealthCheck()
+      this.health = { run: false, running: false, checkedAt: null, results: {} }
+      this.deviceInfo = { brand: null, model: null, firmware: null }
+      this.overrides = { duration: '', modem_ip: '', internet_ip: '', youtube_link: '' }
+      this.firmwareOptions = []
       await this.refresh()
     },
 

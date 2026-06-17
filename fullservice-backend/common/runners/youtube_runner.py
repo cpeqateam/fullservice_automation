@@ -40,6 +40,6 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         ctx.progress(100.0, TestStatus.ERROR.value, f"YouTube açılamadı: {e}")
         return [log_file]
 
-    # Tek bildirim — kapatana kadar açık kalır, ayrıca takip etmiyoruz.
-    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor (kapatana kadar açık)")
+    # Tek bildirim — ilerleme takip edilmez (kapatana kadar açık kalır).
+    ctx.progress(100.0, TestStatus.COMPLETED.value, "▶ YouTube oynatılıyor")
     return [log_file]

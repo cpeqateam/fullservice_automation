@@ -40,20 +40,65 @@
     </v-chip>
 
     <v-btn
+      prepend-icon="mdi-backup-restore"
+      variant="tonal"
+      color="error"
+      size="small"
+      class="mr-3 reset-btn"
+      @click="confirmReset = true"
+    >
+      Sıfırla
+    </v-btn>
+
+    <v-btn
       :icon="appStore.isDarkMode ? 'mdi-weather-night' : 'mdi-white-balance-sunny'"
       variant="text"
       @click="appStore.toggleTheme()"
       class="mr-2"
     />
+
+    <!-- Sıfırlama onayı (yanlışlıkla basmaya karşı) -->
+    <v-dialog v-model="confirmReset" max-width="420">
+      <v-card rounded="xl" class="pa-2">
+        <v-card-title class="d-flex align-center">
+          <v-icon color="error" class="mr-2">mdi-alert-circle-outline</v-icon>
+          Her şeyi sıfırla?
+        </v-card-title>
+        <v-card-text>
+          Tüm testler durdurulacak; ilerleme çubukları, bağlantı durumu (Health-Check)
+          ve oturum bilgisi <strong>programın ilk açıldığı hale</strong> dönecek.
+          Devam etmeden önce Health-Check'i tekrar başlatmanız gerekecek.
+          <br /><br />Emin misiniz?
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="confirmReset = false">Vazgeç</v-btn>
+          <v-btn color="error" variant="flat" :loading="resetting" @click="onReset">
+            Evet, sıfırla
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app-bar>
 </template>
 
 <script setup>
 // Üst bar: logo/başlık + oturum durumu chip'i (HAZIR/ÇALIŞIYOR/TAMAMLANDI) + tema toggle.
 // Durumu store.session'dan okur; mantık taşımaz, yalnızca gösterir.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAppStore } from '@/store/app'
 const appStore = useAppStore()
+
+const confirmReset = ref(false)
+const resetting = ref(false)
+async function onReset() {
+  resetting.value = true
+  try {
+    await appStore.resetAll()
+  } finally {
+    resetting.value = false
+    confirmReset.value = false
+  }
+}
 
 const chipLabel = computed(() => {
   if (appStore.session.running) return 'ÇALIŞIYOR'

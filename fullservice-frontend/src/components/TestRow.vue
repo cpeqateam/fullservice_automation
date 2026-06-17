@@ -5,7 +5,8 @@
         <v-icon :icon="testIcon" size="14" class="mr-1 opacity-70" />
         {{ label }}
       </span>
-      <span class="row-pct">{{ pct }}%</span>
+      <span v-if="taskKey !== 'youtube'" class="row-pct">{{ pct }}%</span>
+      <span v-else class="row-pct">▶</span>
     </div>
     <v-progress-linear
       :model-value="pct"

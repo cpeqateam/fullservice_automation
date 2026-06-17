@@ -7,17 +7,14 @@
       <h2 class="text-h6 font-weight-bold mb-0">Cihaz ve Test Bilgileri</h2>
     </div>
 
-    <!-- DB bağlantı hatası uyarısı (tek satır) -->
-    <v-alert
+    <!-- DB bağlantı hatası uyarısı — kompakt tek satır -->
+    <div
       v-if="appStore.brandsDbFailed || appStore.firmwareDbFailed"
-      type="warning"
-      variant="tonal"
-      density="compact"
-      icon="mdi-database-alert"
-      class="mb-4 db-warn"
+      class="db-warn-line mb-3"
     >
-      DB yok — alanlar serbest metne açıldı.
-    </v-alert>
+      <v-icon size="15" color="warning" class="mr-2">mdi-database-alert</v-icon>
+      <span>DB yok — alanlar serbest metne açıldı.</span>
+    </div>
 
     <v-form @submit.prevent="onStart" class="form-body d-flex flex-column flex-grow-1">
       <!-- Marka -->
@@ -260,7 +257,16 @@ async function onStop() {
   /* Tema duyarlı: koyu temada açık, açık temada koyu (Vuetify değişkeni) */
   color: rgba(var(--v-theme-on-surface), 0.6);
 }
-.db-warn :deep(.v-alert__content) { white-space: nowrap; font-size: 12px; }
+.db-warn-line {
+  display: flex; align-items: center;
+  font-size: 12px;
+  color: rgb(var(--v-theme-warning));
+  background: rgba(var(--v-theme-warning), 0.10);
+  border: 1px solid rgba(var(--v-theme-warning), 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* Oturum & ilerleme özeti */
 .summary {

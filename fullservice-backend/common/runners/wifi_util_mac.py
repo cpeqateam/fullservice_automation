@@ -15,9 +15,18 @@ import subprocess
 
 
 def readWlan():
-    """macOS: system_profiler çıktısını netsh-benzeri satır listesine çevirir."""
-    out = subprocess.run("system_profiler SPAirPortDataType", shell=True,
-                         capture_output=True, text=True).stdout
+    """macOS: system_profiler çıktısını netsh-benzeri satır listesine çevirir.
+
+    NOT: `system_profiler SPAirPortDataType` macOS'ta bazen çok yavaştır / asılı
+    kalır (kullanıcı gözleminde örnekleme 32/33'te takıldı). Bu yüzden timeout ile
+    çağrılır; süre aşarsa boş çıktıyla devam edilir (o örnek "disconnected" yazılır,
+    döngü takılmaz)."""
+    try:
+        out = subprocess.run("system_profiler SPAirPortDataType", shell=True,
+                             capture_output=True, text=True, timeout=8).stdout
+    except Exception as e:
+        print(f"[WIFI-MAC] system_profiler okunamadi/timeout: {e}")
+        out = ""
 
     bssid = "00:00:00:00:00:00"
     ssid = "Unknown"

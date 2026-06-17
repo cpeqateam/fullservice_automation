@@ -14,7 +14,7 @@ from datetime import datetime
 
 from common.protocol import TestParams, TestStatus
 from common.runners.base import (
-    RunContext, NO_WINDOW, is_windows, open_terminal_running, close_terminal,
+    RunContext, NO_WINDOW, is_windows, is_mac, open_terminal_running, close_terminal,
 )
 
 
@@ -26,8 +26,13 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
     count = max(1, int(params.duration))
     if is_windows():
         cmd = ["ping", "-n", str(count), "-w", "1000", target]
+    elif is_mac():
+        # macOS'ta -W MİLİSANİYE'dir; "-W 1" (1ms) tüm yanıtları zaman aşımına
+        # uğratıp satır satır çıktıyı bozuyordu. Varsayılan beklemeyle bırak →
+        # her yanıt satır satır görünür (özet zaten en sonda gelir).
+        cmd = ["ping", "-c", str(count), target]
     else:
-        # Linux/macOS: -c paket sayısı, -W yanıt bekleme (sn)
+        # Linux: -c paket sayısı, -W yanıt bekleme (saniye)
         cmd = ["ping", "-c", str(count), "-W", "1", target]
 
     log_file = ctx.log_path(f"ping_{label}_{target}")

@@ -104,6 +104,12 @@ def session_stop():
     return orch.stop_session()
 
 
+@app.post("/api/session/reset")
+def session_reset():
+    """Her şeyi başa al: testleri durdur, oturumu ve ilerlemeleri sıfırla."""
+    return orch.reset_session()
+
+
 # ── Health-Check (aktif bağlantı kontrolü) ──────────────────
 @app.get("/api/health-check")
 def health_check():

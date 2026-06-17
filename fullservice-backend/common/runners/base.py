@@ -75,19 +75,36 @@ def _osascript_terminal(command: str):
 
 
 def _linux_terminal(inner_cmd: str, title: str):
-    """İlk bulunan Linux terminal emülatöründe bash komutunu çalıştırır."""
+    """İlk bulunan Linux terminal emülatöründe bash komutunu çalıştırır.
+
+    Görünür pencere için grafik oturum (DISPLAY/WAYLAND) gerekir. Sunucu systemd
+    ile veya SSH'tan çalışıyorsa DISPLAY olmaz → pencere açılmaz (None döner).
+    """
+    if not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        print("[TERM] DISPLAY yok (masaustu oturumu degil) — terminal acilmadi. "
+              "Sunucuyu masaustundeki Terminal'den 'python run_server.py' ile baslatin.")
+        return None
+
     keep = f"{inner_cmd}; echo; echo '[bitti — kapatmak için pencereyi kapatın]'; exec bash"
     candidates = [
         ["gnome-terminal", "--title", title, "--", "bash", "-c", keep],
+        ["xfce4-terminal", "--title", title, "-e", f"bash -c {shlex.quote(keep)}"],
         ["konsole", "-p", f"tabtitle={title}", "-e", f"bash -c {shlex.quote(keep)}"],
-        ["x-terminal-emulator", "-e", f"bash -c {shlex.quote(keep)}"],
+        ["mate-terminal", "--title", title, "-e", f"bash -c {shlex.quote(keep)}"],
         ["xterm", "-T", title, "-e", f"bash -c {shlex.quote(keep)}"],
+        ["x-terminal-emulator", "-e", f"bash -c {shlex.quote(keep)}"],
     ]
+    last_err = None
     for term in candidates:
         try:
             return subprocess.Popen(term)
         except FileNotFoundError:
             continue
+        except Exception as e:
+            last_err = e
+            continue
+    print(f"[TERM] Hicbir terminal emulatoru acilamadi (gnome-terminal/xterm yok mu?). "
+          f"Kur: sudo apt install gnome-terminal  | son hata: {last_err}")
     return None
 
 
