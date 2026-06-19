@@ -1,0 +1,142 @@
+<mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
+  <diagram name="Sinif Diyagrami" id="class-diagram">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============ BASLIK ============ -->
+        <mxCell id="title" value="FULL Servis — Backend Sinif/Modul Diyagrami (her .py dosyasi, degiskenleri ve metotlari)" style="text;html=1;align=left;verticalAlign=middle;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1400" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="Renkler:  mavi=giris noktasi   yesil=server paketi   turuncu=agent paketi   sari=common paketi   kirmizi=common/runners (test calistiricilar)&#10;Kesik ok = bagimlilik / import (A --&gt; B : A, B'yi kullanir)" style="text;html=1;align=left;verticalAlign=middle;fontSize=12;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="42" width="1400" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ============ GIRIS NOKTALARI (mavi) ============ -->
+        <mxCell id="run_server" value="&#171;giris&#187; run_server.py&#10;────────────────────────────&#10;sys.path.insert(0, ...)  # import yolu&#10;import: uvicorn, server.main(app, CONFIG, orch)&#10;────────────────────────────&#10;__main__:&#10;  host, port = CONFIG[server]&#10;  uvicorn.run(app, host, port)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="run_agent" value="&#171;giris&#187; run_agent.py&#10;────────────────────────────&#10;sys.argv parse →&#10;  env: FS_NODE_ID, FS_SERVER_URL, FS_AGENT_PORT&#10;import: agent.main(app, AGENT_PORT,&#10;  NODE_ID, SERVER_URL, LAN_IP)&#10;────────────────────────────&#10;__main__:&#10;  uvicorn.run(app, host=0.0.0.0, AGENT_PORT)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="100" width="320" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- ============ SERVER PAKETI (yesil) ============ -->
+        <mxCell id="server_main" value="&#171;FastAPI app&#187; server/main.py&#10;────────────────────────────&#10;CONFIG, orch: Orchestrator, app&#10;class SessionStartRequest(BaseModel):&#10;  modem_ip, internet_ip, youtube_link,&#10;  duration, brand, model, firmware&#10;────────────────────────────&#10;GET  /health&#10;POST /api/register(req)&#10;POST /api/progress(upd)&#10;POST /api/logs/upload(node_id, session_id, file)&#10;GET  /api/state&#10;POST /api/session/start(req)&#10;POST /api/session/stop&#10;POST /api/session/reset&#10;GET  /api/health-check&#10;GET  /api/firmware/brands&#10;GET  /api/firmware/models/{brand}&#10;GET  /api/firmware/versions/{brand}/{model}&#10;mount StaticFiles → dashboard (dist/)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="340" height="360" as="geometry" />
+        </mxCell>
+
+        <mxCell id="orchestrator" value="&#171;class&#187; Orchestrator  (server/orchestrator.py)&#10;────────────────────────────&#10;config, defaults, server_lan_ip&#10;_lock: RLock&#10;nodes: dict[str, dict]&#10;session: dict (session_id, running, device...)&#10;_server_stop: Event&#10;_server_threads: list[Thread]&#10;────────────────────────────&#10;__init__(config)&#10;_blank_test() : dict&#10;register(req)&#10;update_progress(node_id, task, prog, status, msg)&#10;get_state() : dict&#10;_node_view(node) : dict&#10;_iperf_server_ip() : str&#10;start_session(overrides) : dict&#10;_send_start(nv, session_id, roles, params) : bool&#10;_run_server_local(session_id, roles, params)&#10;stop_session() : dict&#10;reset_session() : dict&#10;health_check() : dict" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="720" width="340" height="380" as="geometry" />
+        </mxCell>
+
+        <mxCell id="log_collector" value="&#171;modul&#187; server/log_collector.py&#10;────────────────────────────&#10;_CONFIG&#10;────────────────────────────&#10;node_session_dir(node_id, session_id) : str&#10;save_upload(node_id, session_id, filename, fileobj) : str&#10;list_session_files(session_id) : list[str]" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1140" width="340" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ============ AGENT PAKETI (turuncu) ============ -->
+        <mxCell id="agent_main" value="&#171;FastAPI app&#187; agent/main.py&#10;────────────────────────────&#10;CONFIG, NODE_ID, SERVER_URL,&#10;AGENT_PORT, LAN_IP&#10;executor: TestExecutor, app&#10;────────────────────────────&#10;GET  /health&#10;POST /start(cmd: StartCommand)&#10;POST /stop&#10;_register_loop()   # kayit + heartbeat 10sn&#10;_on_startup()" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="320" width="300" height="220" as="geometry" />
+        </mxCell>
+
+        <mxCell id="test_executor" value="&#171;class&#187; TestExecutor  (agent/test_executor.py)&#10;────────────────────────────&#10;node_id, server_url&#10;_stop: Event&#10;_threads: list[Thread]&#10;session_id: str&#10;────────────────────────────&#10;__init__(node_id, server_url)&#10;start(cmd: StartCommand)&#10;stop()&#10;_run_one(test, runner, params)&#10;_push(task, progress, status, message)&#10;_upload(file_path)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="580" width="300" height="260" as="geometry" />
+        </mxCell>
+
+        <!-- ============ COMMON PAKETI (sari) ============ -->
+        <mxCell id="protocol" value="&#171;modul&#187; common/protocol.py  (sunucu↔agent sozlesmesi)&#10;────────────────────────────&#10;enum TestType: PING_INTERNET, PING_MODEM, YOUTUBE,&#10;  IPERF_SERVER, IPERF, TORRENT, WIFI_TRACK&#10;enum TestStatus: IDLE, RUNNING, COMPLETED, ERROR, STOPPED&#10;TEST_LABELS : dict&#10;────────────────────────────&#10;class RegisterRequest(BaseModel):&#10;  node_id, hostname, platform, ip, agent_port&#10;class TestParams(BaseModel):&#10;  modem_ip, internet_ip, youtube_link, iperf_server,&#10;  iperf_port, iperf_parallel, torrent_magnet,&#10;  torrent_recycle_gb, duration, extra&#10;class StartCommand(BaseModel):&#10;  session_id, tests, params&#10;class ProgressUpdate(BaseModel):&#10;  node_id, session_id, task, progress, status, message, details" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="320" width="380" height="310" as="geometry" />
+        </mxCell>
+
+        <mxCell id="config" value="&#171;modul&#187; common/config.py&#10;────────────────────────────&#10;CONFIG_PATH, LOGS_DIR, DASHBOARD_DIR,&#10;CERT_DIR, _FALLBACK&#10;────────────────────────────&#10;load_config() : dict&#10;get_node(config, node_id) : dict|None&#10;node_log_folder(node_id, config) : str&#10;detect_lan_ip() : str" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="670" width="380" height="170" as="geometry" />
+        </mxCell>
+
+        <mxCell id="firmware_db" value="&#171;modul&#187; common/firmware_db.py  (PostgreSQL/SSL)&#10;────────────────────────────&#10;DB_URL, engine, SessionLocal, ssl_args&#10;────────────────────────────&#10;_libpq_safe_path(path) : str&#10;db_available() : bool&#10;_query(sql, params) : list&#10;get_brands() : list[str]&#10;get_models(brand) : list[str]&#10;get_versions(brand, model) : list[str]" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="880" width="380" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- ============ RUNNERS: base + registry (kirmizi) ============ -->
+        <mxCell id="base" value="&#171;modul&#187; common/runners/base.py  (runner sozlesmesi)&#10;────────────────────────────&#10;NO_WINDOW, CREATE_NEW_CONSOLE&#10;ProgressCb = Callable[[float,str,str], None]&#10;@dataclass RunContext:&#10;  node_id, session_id, log_dir,&#10;  progress: ProgressCb, stop: Event&#10;  + stamp() : str&#10;  + log_path(name) : str&#10;────────────────────────────&#10;is_windows() / is_mac() / is_linux()&#10;open_terminal_running(argv, title)&#10;open_log_viewer(log_file, title)&#10;close_terminal(proc)&#10;_osascript_terminal / _linux_terminal&#10;_write_launch_script / _which" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="320" width="360" height="300" as="geometry" />
+        </mxCell>
+
+        <mxCell id="registry" value="&#171;modul&#187; common/runners/registry.py  (TestType → runner)&#10;────────────────────────────&#10;RunnerFn = Callable[[TestParams, RunContext], list[str]]&#10;RUNNERS : dict[str, RunnerFn]&#10;────────────────────────────&#10;get_runner(test_type) : RunnerFn|None" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="660" width="360" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ============ RUNNERS: testler (kirmizi) ============ -->
+        <mxCell id="ping_runner" value="&#171;runner&#187; ping_runner.py&#10;────────────────────────────&#10;_run_ping(target, label, params, ctx) : list[str]&#10;run_internet(params, ctx) : list[str]&#10;run_modem(params, ctx) : list[str]" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="830" width="360" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="iperf_runner" value="&#171;runner&#187; iperf_runner.py  (client)&#10;────────────────────────────&#10;run(params, ctx) : list[str]   # iperf3 -c, 5x retry&#10;_parse_summary(log_file) : str" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="960" width="360" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="iperf_server_runner" value="&#171;runner&#187; iperf_server_runner.py&#10;────────────────────────────&#10;run(params, ctx) : list[str]   # iperf3 -s (dinler)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="1080" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="youtube_runner" value="&#171;runner&#187; youtube_runner.py&#10;────────────────────────────&#10;run(params, ctx) : list[str]   # tarayicida acar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="1180" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wifi_track_runner" value="&#171;runner&#187; wifi_track_runner.py&#10;────────────────────────────&#10;run(params, ctx) : list[str]   # her sn ornek alir" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="1280" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="torrent_runner" value="&#171;runner&#187; torrent_runner.py&#10;────────────────────────────&#10;QB_URL, QB_USER, QB_PASS&#10;run(params, ctx) : list[str]   # sonsuz indirme dongusu" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="830" width="360" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- ============ RUNNER UTIL'leri (kirmizi) ============ -->
+        <mxCell id="youtube_util" value="&#171;util&#187; youtube_util.py  (Selenium + Chrome)&#10;────────────────────────────&#10;_drivers : list&#10;────────────────────────────&#10;force_play_max(link) : dict   # en yuksek kaliteye zorlar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="1180" width="360" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="torrent_util" value="&#171;util&#187; torrent_util.py  (qBittorrent Web API)&#10;────────────────────────────&#10;NO_WINDOW&#10;────────────────────────────&#10;find_qbittorrent_exe() : str&#10;wait_for_qbittorrent_ui() : bool&#10;ensure_qbittorrent_running()&#10;login_qbittorrent(url, user, pass)&#10;add_torrent(session, url, magnet)&#10;list_torrents(session, url)&#10;remove_torrent_and_files(session, url)&#10;remove_all_torrents(session, url)&#10;_delete(session, url, hash)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="960" width="360" height="210" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wifi_util" value="&#171;util&#187; wifi_util.py  (Windows / netsh)&#10;────────────────────────────&#10;SPACER&#10;────────────────────────────&#10;readWlan() : list&#10;getSignalInfo(out) : list&#10;getSystemInfo() : list&#10;writeLogsToFile(log, filename)&#10;createFileName(inputs) : str&#10;getOneTimeInfo(wlanInfo, filename)&#10;sample_once(read_wlan, filename) : str" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="1310" width="360" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="wifi_util_mac" value="&#171;util&#187; wifi_util_mac.py  (macOS / system_profiler)&#10;────────────────────────────&#10;readWlan() : list   # netsh-benzeri satira cevirir" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1640" y="1520" width="360" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ============ BAGIMLILIK OKLARI ============ -->
+        <mxCell id="e1" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="run_server" target="server_main"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="run_agent" target="agent_main"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="server_main" target="orchestrator"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="server_main" target="log_collector"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="server_main" target="firmware_db"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="server_main" target="protocol"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="agent_main" target="test_executor"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="agent_main" target="protocol"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="test_executor" target="registry"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="test_executor" target="base"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="registry"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="base"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="ping_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e15" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="iperf_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="iperf_server_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="youtube_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e18" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="wifi_track_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e19" style="endArrow=open;dashed=1;html=1;strokeColor=#b85450;" edge="1" parent="1" source="registry" target="torrent_runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e20" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="ping_runner" target="base"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e21" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="youtube_runner" target="youtube_util"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e22" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="torrent_runner" target="torrent_util"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e23" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="wifi_track_runner" target="wifi_util"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e24" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="wifi_track_runner" target="wifi_util_mac"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e25" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="firmware_db" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e26" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="log_collector" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e27" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="registry" target="protocol"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
