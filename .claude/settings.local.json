@@ -34,7 +34,10 @@
       "Bash(ls -la *.md *.drawio)",
       "Bash(ls -la kodhakimiyeti.md kod_hakimiyet*.md)",
       "Bash(wc -l MIMARI.md README.md fullservice-backend/README.md fullservice-frontend/README.md)",
-      "Bash(python -c \"import xml.dom.minidom; xml.dom.minidom.parse\\('../MIMARI.drawio'\\); print\\('drawio XML gecerli'\\)\")"
+      "Bash(python -c \"import xml.dom.minidom; xml.dom.minidom.parse\\('../MIMARI.drawio'\\); print\\('drawio XML gecerli'\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -17,18 +17,18 @@ Aynı makinede birden fazla agent çalıştıracaksan her birine FARKLI port ver
 import os
 import sys
 
-if len(sys.argv) < 2:
+if len(sys.argv) < 2: # node_id gerekli
     print("Kullanim: python run_agent.py <node_id> [server_url] [port]")
     print("  node_id: mac_cable | win_wifi | mac_wifi")
     sys.exit(1)
 
-os.environ["FS_NODE_ID"] = sys.argv[1]
+os.environ["FS_NODE_ID"] = sys.argv[1] # node_id'yi ortam değişkeni olarak ayarla
 if len(sys.argv) >= 3:
-    os.environ["FS_SERVER_URL"] = sys.argv[2]
+    os.environ["FS_SERVER_URL"] = sys.argv[2] # server_url verilmişse ortam değişkeni olarak ayarla (örn. http://
 if len(sys.argv) >= 4:
-    os.environ["FS_AGENT_PORT"] = sys.argv[3]
+    os.environ["FS_AGENT_PORT"] = sys.argv[3] # port verilmişse ortam değişkeni olarak ayarla (örn. 8771)
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))) # agent klasöründeki modülleri bulabilmesi için çalışma dizinini sys.path'e ekle
 
 import uvicorn
 from agent.main import app, AGENT_PORT, NODE_ID, SERVER_URL, LAN_IP
