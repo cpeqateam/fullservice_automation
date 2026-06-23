@@ -16,7 +16,7 @@ import time
 from datetime import datetime
 
 from common.protocol import TestStatus
-from common.runners.base import RunContext, NO_WINDOW
+from common.runners.base import RunContext, NO_WINDOW, open_log_viewer, close_terminal
 
 
 def run(params, ctx: RunContext) -> list[str]:
@@ -34,18 +34,21 @@ def run(params, ctx: RunContext) -> list[str]:
             f.write(f"FULL Servis iperf3 SERVER — Node: {ctx.node_id}\n")
             f.write(f"Komut: {' '.join(cmd)}\nBaslangic: {datetime.now()}\n" + "-" * 30 + "\n")
             f.flush()
+            viewer = open_log_viewer(log_file, f"iperf SERVER :{params.iperf_port} [{ctx.node_id}]")
             try:
                 proc = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT,
                                         text=True, creationflags=NO_WINDOW)
             except FileNotFoundError:
                 msg = "iperf3 bulunamadı. Kurulum: brew install iperf3 / apt install iperf3"
                 f.write(msg + "\n")
+                close_terminal(viewer)
                 ctx.progress(100.0, TestStatus.ERROR.value, msg)
                 return [log_file]
 
             for i in range(listen_secs):
                 if ctx.stop.is_set():
                     proc.terminate()
+                    close_terminal(viewer)
                     ctx.progress(100.0, TestStatus.STOPPED.value, "iperf server durduruldu")
                     f.write(f"\nDurduruldu: {datetime.now()}\n")
                     return [log_file]
@@ -64,6 +67,7 @@ def run(params, ctx: RunContext) -> list[str]:
                 proc.kill()
             f.write("\n" + "-" * 30 + f"\nBitis: {datetime.now()}\n")
 
+        close_terminal(viewer)
         ctx.progress(100.0, TestStatus.COMPLETED.value, "iperf server tamamlandı (dinleme bitti)")
         return [log_file]
 

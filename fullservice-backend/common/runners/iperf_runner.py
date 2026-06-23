@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 
 from common.protocol import TestParams, TestStatus
-from common.runners.base import RunContext, NO_WINDOW
+from common.runners.base import RunContext, NO_WINDOW, open_log_viewer, close_terminal
 
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
@@ -49,9 +49,11 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             f.write(f"Baslangic: {datetime.now()}\n" + "-" * 30 + "\n")
             f.flush()
 
+            viewer = open_log_viewer(log_file, f"iperf CLIENT → {server} [{ctx.node_id}]")
             proc = None
             for attempt in range(1, MAX_ATTEMPTS + 1):
                 if ctx.stop.is_set():
+                    close_terminal(viewer)
                     ctx.progress(0.0, TestStatus.STOPPED.value, "iperf durduruldu")
                     return [log_file]
                 try:
@@ -60,6 +62,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
                 except FileNotFoundError:
                     msg = "iperf3 bulunamadı. Kurulum: apt install iperf3 / brew install iperf3"
                     f.write(msg + "\n")
+                    close_terminal(viewer)
                     ctx.progress(100.0, TestStatus.ERROR.value, msg)
                     return [log_file]
 
@@ -68,6 +71,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
                 for i in range(duration):
                     if ctx.stop.is_set():
                         proc.terminate()
+                        close_terminal(viewer)
                         ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "iperf durduruldu")
                         return [log_file]
                     if proc.poll() is not None:
@@ -98,6 +102,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
 
             f.write("\n" + "-" * 30 + f"\nBitis: {datetime.now()}\n")
 
+        close_terminal(viewer)
         summary = _parse_summary(log_file)
         rc = proc.returncode if proc else 1
         status = TestStatus.COMPLETED.value if rc == 0 else TestStatus.ERROR.value
