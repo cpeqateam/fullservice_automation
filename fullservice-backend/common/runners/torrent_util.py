@@ -85,8 +85,9 @@ def wait_for_qbittorrent_ui(host="127.0.0.1", port=8080, timeout=30) -> bool:
             time.sleep(1)
 
 
-def ensure_qbittorrent_running():
-    """qBittorrent çalışmıyorsa başlatır ve Web UI'nin açılmasını bekler."""
+def ensure_qbittorrent_running() -> bool:
+    """qBittorrent çalışmıyorsa başlatır ve Web UI'nin açılmasını bekler.
+    Başarılıysa True, Web UI açılmazsa False döner."""
     try:
         import psutil
         already = any(
@@ -97,16 +98,29 @@ def ensure_qbittorrent_running():
         already = False
 
     if already:
-        wait_for_qbittorrent_ui()
-        return
+        print("[TORRENT] qBittorrent zaten calisiyor, Web UI bekleniyor...")
+        ok = wait_for_qbittorrent_ui()
+        if not ok:
+            print("[TORRENT] qBittorrent calisiyor ama Web UI port 8080'de acilmadi.")
+        return ok
 
     exe = find_qbittorrent_exe()
+    print(f"[TORRENT] qBittorrent baslatiliyor: {exe}")
     try:
-        subprocess.Popen([exe], creationflags=NO_WINDOW)
+        # Görünür pencereyle başlat — Web UI ilk kez ayarlanmamışsa kullanıcı yapılandırabilsin
+        subprocess.Popen([exe])
+    except FileNotFoundError:
+        print(f"[TORRENT] qBittorrent bulunamadi: '{exe}'. PATH'e ekle veya QBTORRENT_PATH ortam degiskenini ayarla.")
+        return False
     except Exception as e:
-        print(f"[TORRENT] qBittorrent baslatilamadi ({exe}): {e}")
-        return
-    wait_for_qbittorrent_ui()
+        print(f"[TORRENT] qBittorrent baslatma hatasi ({exe}): {e}")
+        return False
+
+    print("[TORRENT] qBittorrent aciliyor, Web UI bekleniyor (max 30sn)...")
+    ok = wait_for_qbittorrent_ui(timeout=30)
+    if not ok:
+        print("[TORRENT] Web UI 30sn icinde acilmadi. Tools->Options->Web UI->Aktif et, port 8080.")
+    return ok
 
 
 def login_qbittorrent(qb_url, username, password):

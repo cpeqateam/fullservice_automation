@@ -40,7 +40,12 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
 
     try:
         ctx.progress(0.0, TestStatus.RUNNING.value, "qBittorrent başlatılıyor...")
-        torrent_util.ensure_qbittorrent_running()
+        ok = torrent_util.ensure_qbittorrent_running()
+        if not ok:
+            msg = "qBittorrent başlatılamadı veya Web UI port 8080'de açılmadı. qBittorrent'i elle aç → Tools→Options→Web UI: aktif, port 8080."
+            log(msg)
+            ctx.progress(100.0, TestStatus.ERROR.value, msg)
+            return [log_file]
 
         session = torrent_util.login_qbittorrent(QB_URL, QB_USER, QB_PASS)
         if not session:
