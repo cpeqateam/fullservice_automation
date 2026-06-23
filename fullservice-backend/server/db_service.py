@@ -1,0 +1,283 @@
+"""
+FULL Servis — Veritabanı yazma servisi (sunucu tarafı).
+
+Test sonuçlarını PostgreSQL'e (cpeqadb) yazar. Şu an STAGING aşamasındayız:
+GRK'yı riske atmamak için sonuçlar `copy_` önekli kopya tablolara yazılır.
+Her şey doğrulanınca aşağıdaki TABLO ADI sabitlerini copy_'siz hale getirip
+(ör. "copy_test_session" -> "test_session") asıl tablolara geçilir — kod değişmez,
+sadece bu 6 sabit değişir.
+
+GRK'daki app/services/db_service.py mantığının dağıtık (çok-düğümlü) karşılığıdır:
+  • Her satıra test_name='FULL_SERVIS' yazılır (GRK satırlarından ayırt etmek için).
+  • Her sonuç satırında node_name vardır (hangi makine: LINUX/MAC_ETH/...).
+
+Bağlantı yoksa (firmware_db.SessionLocal=None) tüm fonksiyonlar sessizce atlar;
+testler DB olmadan da çalışmaya devam eder.
+
+Bağlantı/sertifika yapılandırması firmware_db.py'de yapılır; buradaki yazma
+işlemleri o modülün hazırladığı SessionLocal'ı (aynı SSL bağlantısı) kullanır.
+"""
+from __future__ import annotations
+
+from common import firmware_db
+
+# ── TABLO ADLARI ────────────────────────────────────────────────────────
+# Birleştirme zamanı: copy_ öneklerini kaldır (firmware zaten grk_firmware).
+T_FIRMWARE = "grk_firmware"        # combobox + FK kaynağı (GRK'ya dokunulmadı)
+T_SESSION  = "copy_test_session"
+T_PING     = "copy_ping_test"
+T_SPEED    = "copy_speed_test"
+T_WIFI     = "copy_wifi_analysis"
+T_IPERF    = "copy_iperf_test"
+
+TEST_NAME = "FULL_SERVIS"          # bu projenin tüm satırlarına yazılır
+
+
+# ── Tip dönüştürme yardımcıları (None-güvenli) ──────────────────────────
+def _f(val, decimals: int = 3):
+    """float'a çevirir; çevrilemezse None döner (DB'de NULL)."""
+    if val is None:
+        return None
+    try:
+        return round(float(val), decimals)
+    except (TypeError, ValueError):
+        return None
+
+
+def _i(val):
+    """int'e çevirir; çevrilemezse None döner."""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _s(val):
+    """str'e çevirir; None ise None bırakır."""
+    return None if val is None else str(val)
+
+
+def db_available() -> bool:
+    return firmware_db.SessionLocal is not None
+
+
+def _get_firmware_id(db, brand, model, firmware):
+    """Marka/model/firmware'den firmware_id bulur (LOWER/TRIM ile esnek eşleşme).
+    Bulamazsa None döner — oturum yine NULL firmware_id ile oluşturulur."""
+    if not (brand and model and firmware):
+        return None
+    from sqlalchemy import text
+    try:
+        row = db.execute(text(
+            f"SELECT firmware_id FROM {T_FIRMWARE} "
+            "WHERE LOWER(TRIM(brand)) = LOWER(TRIM(:b)) "
+            "AND LOWER(TRIM(model)) = LOWER(TRIM(:m)) "
+            "AND LOWER(TRIM(firmware_version)) = LOWER(TRIM(:f)) LIMIT 1"
+        ), {"b": brand, "m": model, "f": firmware}).fetchone()
+        if row:
+            return row[0]
+        print(f"[DB] Firmware eslesmedi: {brand!r}/{model!r}/{firmware!r} (firmware_id=NULL)")
+    except Exception as e:
+        print(f"[DB] Firmware sorgusu hatasi: {e}")
+    return None
+
+
+# ── OTURUM ──────────────────────────────────────────────────────────────
+def create_session(brand, model, firmware, start_time,
+                   has_ping=False, has_speedtest=False, has_wifi=False):
+    """copy_test_session'a yeni satır ekler, oluşan session_id'yi döner.
+    DB yoksa veya hata olursa None döner (test yine çalışır)."""
+    if not db_available():
+        print("[DB] Baglanti yok — copy_test_session olusturulamadi (test devam eder).")
+        return None
+
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        firmware_id = _get_firmware_id(db, brand, model, firmware)
+        row = db.execute(text(
+            f"INSERT INTO {T_SESSION} "
+            "(firmware_id, test_name, session_start_time, "
+            " has_ping_test, has_speedtest, has_wifi_analysis) "
+            "VALUES (:fid, :tn, :st, :hp, :hs, :hw) RETURNING session_id"
+        ), {
+            "fid": firmware_id, "tn": TEST_NAME, "st": start_time,
+            "hp": has_ping, "hs": has_speedtest, "hw": has_wifi,
+        }).fetchone()
+        db.commit()
+        session_id = row[0]
+        print(f"[DB] copy_test_session olusturuldu: session_id={session_id} (firmware_id={firmware_id})")
+        return session_id
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_test_session olusturulamadi: {e}")
+        return None
+    finally:
+        db.close()
+
+
+def update_session_end(session_id, end_time, test_duration,
+                       ftp_file_path=None, error_log_ftp_path=None):
+    """Oturumun bitiş zamanı/süresi/FTP yollarını günceller."""
+    if not db_available() or not session_id:
+        return
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"UPDATE {T_SESSION} SET session_end_time=:et, test_duration=:dur, "
+            "ftp_file_path=:ftp, error_log_ftp_path=:err WHERE session_id=:sid"
+        ), {
+            "sid": session_id, "et": end_time, "dur": _i(test_duration),
+            "ftp": ftp_file_path, "err": error_log_ftp_path,
+        })
+        db.commit()
+        print(f"[DB] copy_test_session guncellendi (bitis): session_id={session_id}")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_test_session guncellenemedi: {e}")
+    finally:
+        db.close()
+
+
+# ── PING ────────────────────────────────────────────────────────────────
+def save_ping(session_id, node_name, stats: dict, ftp_file_path=None):
+    """copy_ping_test'e bir ping özeti satırı yazar."""
+    if not db_available() or not session_id:
+        return
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"INSERT INTO {T_PING} "
+            "(session_id, test_name, node_name, target_ip, ip_version, "
+            " total_pings, successful_pings, failed_pings, success_rate, "
+            " packet_loss_percent, min_time, max_time, avg_time, median_time, "
+            " std_dev_time, ftp_file_path, test_start_time, test_end_time) "
+            "VALUES (:sid, :tn, :nn, :tip, :ipv, :tot, :suc, :fail, :sr, "
+            " :loss, :mn, :mx, :avg, :med, :std, :ftp, :ts, :te)"
+        ), {
+            "sid": session_id, "tn": TEST_NAME, "nn": node_name,
+            "tip": _s(stats.get("target_ip")), "ipv": _s(stats.get("ip_version", "IPv4")),
+            "tot": _i(stats.get("total_pings")), "suc": _i(stats.get("successful_pings")),
+            "fail": _i(stats.get("failed_pings")), "sr": _f(stats.get("success_rate"), 2),
+            "loss": _f(stats.get("packet_loss_percent"), 2),
+            "mn": _f(stats.get("min_time")), "mx": _f(stats.get("max_time")),
+            "avg": _f(stats.get("avg_time")), "med": _f(stats.get("median_time")),
+            "std": _f(stats.get("std_dev_time")), "ftp": ftp_file_path,
+            "ts": stats.get("test_start_time"), "te": stats.get("test_end_time"),
+        })
+        db.commit()
+        print(f"[DB] copy_ping_test yazildi: node={node_name} target={stats.get('target_ip')}")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_ping_test yazilamadi: {e}")
+    finally:
+        db.close()
+
+
+# ── IPERF ───────────────────────────────────────────────────────────────
+def save_iperf(session_id, node_name, server_node_name, stats: dict, ftp_file_path=None):
+    """copy_iperf_test'e bir iperf özeti satırı yazar."""
+    if not db_available() or not session_id:
+        return
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"INSERT INTO {T_IPERF} "
+            "(session_id, test_name, node_name, server_node_name, server_ip, "
+            " port, parallel, duration, sender_mbps, receiver_mbps, "
+            " ftp_file_path, test_start_time, test_end_time) "
+            "VALUES (:sid, :tn, :nn, :snn, :sip, :port, :par, :dur, "
+            " :snd, :rcv, :ftp, :ts, :te)"
+        ), {
+            "sid": session_id, "tn": TEST_NAME, "nn": node_name,
+            "snn": server_node_name, "sip": _s(stats.get("server_ip")),
+            "port": _i(stats.get("port")), "par": _i(stats.get("parallel")),
+            "dur": _i(stats.get("duration")), "snd": _f(stats.get("sender_mbps"), 2),
+            "rcv": _f(stats.get("receiver_mbps"), 2), "ftp": ftp_file_path,
+            "ts": stats.get("test_start_time"), "te": stats.get("test_end_time"),
+        })
+        db.commit()
+        print(f"[DB] copy_iperf_test yazildi: node={node_name} -> server={server_node_name}")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_iperf_test yazilamadi: {e}")
+    finally:
+        db.close()
+
+
+# ── WIFI ────────────────────────────────────────────────────────────────
+def save_wifi(session_id, node_name, stats: dict, ftp_file_path=None):
+    """copy_wifi_analysis'e bir wifi özeti satırı yazar."""
+    if not db_available() or not session_id:
+        return
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"INSERT INTO {T_WIFI} "
+            "(session_id, test_name, node_name, total_samples, disconnected_count, "
+            " connected_count, channel, wifi_protocol, bssid, "
+            " avg_signal_percentage, min_signal_percentage, max_signal_percentage, "
+            " avg_rx_rate, avg_tx_rate, avg_cpu_usage, avg_ram_usage, "
+            " ftp_file_path, test_start_time, test_end_time) "
+            "VALUES (:sid, :tn, :nn, :ts_, :dc, :cc, :ch, :wp, :bs, "
+            " :asig, :msig, :xsig, :arx, :atx, :acpu, :aram, :ftp, :ts, :te)"
+        ), {
+            "sid": session_id, "tn": TEST_NAME, "nn": node_name,
+            "ts_": _i(stats.get("total_samples")), "dc": _i(stats.get("disconnected_count")),
+            "cc": _i(stats.get("connected_count")), "ch": _s(stats.get("channel")),
+            "wp": _s(stats.get("wifi_protocol")), "bs": _s(stats.get("bssid")),
+            "asig": _f(stats.get("avg_signal_percentage"), 2),
+            "msig": _f(stats.get("min_signal_percentage"), 2),
+            "xsig": _f(stats.get("max_signal_percentage"), 2),
+            "arx": _f(stats.get("avg_rx_rate"), 2), "atx": _f(stats.get("avg_tx_rate"), 2),
+            "acpu": _f(stats.get("avg_cpu_usage"), 2), "aram": _f(stats.get("avg_ram_usage"), 2),
+            "ftp": ftp_file_path,
+            "ts": stats.get("test_start_time"), "te": stats.get("test_end_time"),
+        })
+        db.commit()
+        print(f"[DB] copy_wifi_analysis yazildi: node={node_name}")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_wifi_analysis yazilamadi: {e}")
+    finally:
+        db.close()
+
+
+# ── SPEED (FULL Serviste kullanılmıyor; bütünlük için) ──────────────────
+def save_speed(session_id, node_name, stats: dict, ftp_file_path=None):
+    """copy_speed_test'e satır yazar. FULL Serviste speedtest rolü yok; ileride
+    bir otomasyon eklerse diye hazır durur."""
+    if not db_available() or not session_id:
+        return
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"INSERT INTO {T_SPEED} "
+            "(session_id, test_name, node_name, total_measurements, "
+            " avg_download_mbps, avg_upload_mbps, min_download_mbps, max_download_mbps, "
+            " min_upload_mbps, max_upload_mbps, latency, jitter, server_name, ftp_file_path) "
+            "VALUES (:sid, :tn, :nn, :tm, :ad, :au, :mnd, :mxd, :mnu, :mxu, "
+            " :lat, :jit, :srv, :ftp)"
+        ), {
+            "sid": session_id, "tn": TEST_NAME, "nn": node_name,
+            "tm": _i(stats.get("total_measurements")),
+            "ad": _f(stats.get("avg_download_mbps")), "au": _f(stats.get("avg_upload_mbps")),
+            "mnd": _f(stats.get("min_download_mbps")), "mxd": _f(stats.get("max_download_mbps")),
+            "mnu": _f(stats.get("min_upload_mbps")), "mxu": _f(stats.get("max_upload_mbps")),
+            "lat": _f(stats.get("latency")), "jit": _f(stats.get("jitter")),
+            "srv": _s(stats.get("server_name")), "ftp": ftp_file_path,
+        })
+        db.commit()
+        print(f"[DB] copy_speed_test yazildi: node={node_name}")
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] copy_speed_test yazilamadi: {e}")
+    finally:
+        db.close()

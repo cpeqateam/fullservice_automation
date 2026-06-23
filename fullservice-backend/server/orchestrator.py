@@ -24,6 +24,8 @@ from common.config import LOGS_DIR, detect_lan_ip, node_log_folder
 from common.protocol import TestParams, TestStatus, TEST_LABELS
 from common.runners.base import RunContext
 from common.runners.registry import get_runner
+from server import db_service
+from server import ftp_service
 
 
 class Orchestrator:
@@ -53,6 +55,7 @@ class Orchestrator:
 
         self.session = {"session_id": None, "running": False,
                         "started_at": None, "ended_at": None, "params": {},
+                        "db_session_id": None,
                         "device": {"brand": None, "model": None, "firmware": None}}
 
         # Sunucu-yerel testler için durdurma bayrağı + thread'ler
@@ -172,6 +175,7 @@ class Orchestrator:
                 "started_at": datetime.now().isoformat(timespec="seconds"),
                 "ended_at": None,
                 "params": params.dict() if hasattr(params, "dict") else params.model_dump(),
+                "db_session_id": None,
                 "device": {
                     "brand":    overrides.get("brand"),
                     "model":    overrides.get("model"),
@@ -184,6 +188,21 @@ class Orchestrator:
                     node["tests"][r] = self._blank_test()
 
             online_nodes = [self._node_view(n) for n in self.nodes.values()]
+            started_at = self.session["started_at"]
+            device = dict(self.session["device"])
+
+        # DB: oturum satırını (copy_test_session) oluştur — lock dışında (ağ/DB I/O).
+        # Hangi test tipleri var? (has_* bayrakları için tüm düğümlerin rollerinin birleşimi)
+        roles_all = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])}
+        db_session_id = db_service.create_session(
+            device.get("brand"), device.get("model"), device.get("firmware"),
+            started_at,
+            has_ping=any(r in roles_all for r in ("ping_internet", "ping_modem")),
+            has_speedtest="speedtest" in roles_all,
+            has_wifi="wifi_track" in roles_all,
+        )
+        with self._lock:
+            self.session["db_session_id"] = db_session_id
 
         # iperf server'ı artık Linux sunucu değil, "iperf_server" rolündeki kablolu
         # Mac kendi agent'ında koşturur (fan-out ile başlatılır). Sunucu tarafında
@@ -220,6 +239,56 @@ class Orchestrator:
 
         return {"session_id": session_id, "dispatched": dispatched, "skipped": skipped}
 
+    def _iperf_server_node_name(self) -> str | None:
+        """iperf server rolündeki düğümün log adını (MAC_ETH gibi) döner — iperf
+        satırına 'server tarafı hangi makineydi' bilgisini yazmak için."""
+        node = next(
+            (n for n in self.nodes.values() if "iperf_server" in n.get("roles", [])),
+            None,
+        )
+        return node_log_folder(node["node_id"], self.config) if node else None
+
+    def record_result(self, node_id: str, kind: str, stats: dict, ftp_file_path: str | None = None):
+        """Bir testin nihai özetini ilgili copy_ tablosuna yazar. Hem agent'lardan
+        (/api/result) hem sunucu-yerel testlerden çağrılır. DB yoksa sessizce atlar.
+        ftp_file_path verilmezse sunucu, FTP hedef klasörünü kendisi hesaplar (DB'de
+        'bu testin logları FTP'de nerede' işaretçisi olur)."""
+        db_sid = self.session.get("db_session_id")
+        if not db_sid:
+            return
+        node_name = node_log_folder(node_id, self.config)
+        if not ftp_file_path:
+            dev = self.session.get("device", {})
+            ftp_file_path = ftp_service.build_target_dir(
+                dev.get("brand"), dev.get("model"), dev.get("firmware"),
+                ftp_service.test_type_from_kind(kind), node_name,
+            )
+        try:
+            if kind == "ping":
+                db_service.save_ping(db_sid, node_name, stats, ftp_file_path)
+            elif kind == "iperf":
+                db_service.save_iperf(db_sid, node_name, self._iperf_server_node_name(),
+                                      stats, ftp_file_path)
+            elif kind == "wifi":
+                db_service.save_wifi(db_sid, node_name, stats, ftp_file_path)
+            else:
+                print(f"[ORCH] Bilinmeyen sonuc tipi: {kind}")
+        except Exception as e:
+            print(f"[ORCH] record_result hatasi ({kind}): {e}")
+
+    def upload_log_to_ftp(self, node_id: str, file_path: str):
+        """Bir log dosyasını FTP'ye, doğru klasör yapısına (arka planda) yükler:
+        <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
+        Test tipi dosya adından, bilgisayar node'un log adından çözülür."""
+        if not file_path:
+            return
+        dev = self.session.get("device", {})
+        node_name = node_log_folder(node_id, self.config)
+        test_type = ftp_service.test_type_from_filename(os.path.basename(file_path))
+        target = ftp_service.build_target_dir(
+            dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
+        ftp_service.upload_async([file_path], target)
+
     def _send_start(self, nv: dict, session_id: str, roles: list, params: TestParams) -> bool:
         url = f"http://{nv['ip']}:{nv['agent_port']}/start"
         payload = {
@@ -253,9 +322,13 @@ class Orchestrator:
                     node_id="server", session_id=session_id, log_dir=log_dir,
                     progress=lambda p, s, m, _t=t: self.update_progress("server", _t, p, s, m),
                     stop=self._server_stop,
+                    result=lambda kind, stats: self.record_result("server", kind, stats),
                 )
                 try:
-                    fn(params, ctx)
+                    logs = fn(params, ctx) or []
+                    # Sunucunun kendi testlerinin loglarını da FTP'ye yükle
+                    for lp in logs:
+                        self.upload_log_to_ftp("server", lp)
                 except Exception as e:
                     self.update_progress("server", t, 100.0, TestStatus.ERROR.value, f"Hata: {e}")
 
@@ -268,6 +341,20 @@ class Orchestrator:
             self.session["running"] = False
             self.session["ended_at"] = datetime.now().isoformat(timespec="seconds")
             targets = [self._node_view(n) for n in self.nodes.values() if not n.get("is_server")]
+            db_sid = self.session.get("db_session_id")
+            started_at = self.session.get("started_at")
+            ended_at = self.session["ended_at"]
+
+        # DB: oturumun bitiş zamanını/süresini güncelle (copy_test_session)
+        if db_sid:
+            duration = None
+            try:
+                if started_at:
+                    duration = int((datetime.fromisoformat(ended_at)
+                                    - datetime.fromisoformat(started_at)).total_seconds())
+            except Exception:
+                duration = None
+            db_service.update_session_end(db_sid, ended_at, duration)
 
         # Sunucu-yerel testleri durdur
         self._server_stop.set()
@@ -295,6 +382,7 @@ class Orchestrator:
         with self._lock:
             self.session = {"session_id": None, "running": False,
                             "started_at": None, "ended_at": None, "params": {},
+                            "db_session_id": None,
                             "device": {"brand": None, "model": None, "firmware": None}}
             for node in self.nodes.values():
                 for r in node["roles"]:

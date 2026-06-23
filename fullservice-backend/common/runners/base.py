@@ -30,6 +30,10 @@ CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 # İlerleme bildirimi imzası: (yüzde 0..100, status, mesaj)
 ProgressCb = Callable[[float, str, str], None]
 
+# Nihai sonuç bildirimi imzası: (kind, stats) — test bitince DB'ye yazılacak özet.
+#   kind: "ping" | "iperf" | "wifi"   stats: teste özgü alanları içeren dict
+ResultCb = Callable[[str, dict], None]
+
 
 @dataclass
 class RunContext:
@@ -39,6 +43,9 @@ class RunContext:
     log_dir: str
     progress: ProgressCb
     stop: threading.Event = field(default_factory=threading.Event)
+    # Test bitince yapısal özet bildirmek için (opsiyonel). Ayarlanmamışsa runner
+    # sadece log/progress üretir, DB'ye bir şey yazılmaz.
+    result: Optional[ResultCb] = None
 
     def stamp(self) -> str:
         return datetime.now().strftime("%Y%m%d_%H%M%S")

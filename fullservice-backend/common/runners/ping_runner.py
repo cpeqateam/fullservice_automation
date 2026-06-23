@@ -8,6 +8,8 @@ GRK ping_service'ten uyarlanmıştır. Kullanıcı isteri: ping atılırken komu
 Görünür pencere yalnızca masaüstü oturumunda açılır; açılamazsa test arka planda
 normal devam eder. ping_internet ve ping_modem aynı motoru farklı hedefle kullanır.
 """
+import re
+import statistics
 import subprocess
 import time
 from datetime import datetime
@@ -16,6 +18,45 @@ from common.protocol import TestParams, TestStatus
 from common.runners.base import (
     RunContext, NO_WINDOW, is_windows, is_mac, open_terminal_running, close_terminal,
 )
+
+
+def _compute_ping_stats(log_file: str, target: str, count: int,
+                        start_iso: str, end_iso: str) -> dict:
+    """Ping log dosyasından özet istatistik çıkarır. Yanıt sürelerini (time=/süre=)
+    platform/dil bağımsız regex ile toplayıp min/max/avg/median/std hesaplar.
+    Başarılı = yanıt süresi bulunan paket sayısı; gerisi kayıp sayılır."""
+    times: list[float] = []
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        # "time=12.3 ms" (EN), "süre=12 ms"/"zaman=12ms" (TR Windows), "time<1ms"
+        for m in re.findall(r"(?:time|s[üu]re|zaman)[=<]\s*([\d.,]+)", text, re.IGNORECASE):
+            try:
+                times.append(float(m.replace(",", ".")))
+            except ValueError:
+                pass
+    except Exception as e:
+        print(f"[PING] stat hesaplanamadi: {e}")
+
+    total = max(count, len(times))
+    success = len(times)
+    failed = max(0, total - success)
+    return {
+        "target_ip": target,
+        "ip_version": "IPv6" if ":" in (target or "") else "IPv4",
+        "total_pings": total,
+        "successful_pings": success,
+        "failed_pings": failed,
+        "success_rate": round(success / total * 100, 2) if total else 0.0,
+        "packet_loss_percent": round(failed / total * 100, 2) if total else 100.0,
+        "min_time": min(times) if times else None,
+        "max_time": max(times) if times else None,
+        "avg_time": statistics.mean(times) if times else None,
+        "median_time": statistics.median(times) if times else None,
+        "std_dev_time": statistics.pstdev(times) if len(times) > 1 else 0.0,
+        "test_start_time": start_iso,
+        "test_end_time": end_iso,
+    }
 
 
 def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> list[str]:
@@ -36,6 +77,7 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
         cmd = ["ping", "-c", str(count), "-W", "1", target]
 
     log_file = ctx.log_path(f"ping_{label}_{target}")
+    start_iso = datetime.now().isoformat(timespec="seconds")
     ctx.progress(0.0, TestStatus.RUNNING.value, f"{label} başlıyor → {target}")
 
     # Canlı izleme için görünür terminal (best-effort, masaüstü oturumu gerekir)
@@ -59,6 +101,10 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
                     close_terminal(viewer)
                     f.write(f"\n-- Kullanici durdurdu: {datetime.now()} --\n")
                     ctx.progress((i / count) * 100, TestStatus.STOPPED.value, f"{label} durduruldu")
+                    f.flush()
+                    if ctx.result:
+                        end_iso = datetime.now().isoformat(timespec="seconds")
+                        ctx.result("ping", _compute_ping_stats(log_file, target, i, start_iso, end_iso))
                     return [log_file]
                 if proc.poll() is not None:
                     break
@@ -72,6 +118,9 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
         status = TestStatus.COMPLETED.value if proc.returncode == 0 else TestStatus.ERROR.value
         msg = f"{label} tamamlandı" if proc.returncode == 0 else f"{label}: yanıt yok / hata"
         ctx.progress(100.0, status, msg)
+        if ctx.result:
+            end_iso = datetime.now().isoformat(timespec="seconds")
+            ctx.result("ping", _compute_ping_stats(log_file, target, count, start_iso, end_iso))
         return [log_file]
 
     except Exception as e:

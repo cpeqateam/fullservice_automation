@@ -58,6 +58,7 @@ class TestExecutor:
             log_dir=session_dir,
             progress=lambda p, s, m: self._push(test, p, s, m),
             stop=self._stop,
+            result=lambda kind, stats, _t=test: self._report_result(_t, kind, stats),
         )
         logs: list[str] = []
         try:
@@ -80,6 +81,20 @@ class TestExecutor:
         }
         try:
             requests.post(f"{self.server_url}/api/progress", json=payload, timeout=3)
+        except Exception:
+            pass  # sunucuya ulaşılamasa da test devam etsin
+
+    def _report_result(self, task: str, kind: str, stats: dict):
+        """Test bitince nihai özeti sunucuya iletir (sunucu DB'ye yazar)."""
+        payload = {
+            "node_id": self.node_id,
+            "session_id": self.session_id or "",
+            "task": task,
+            "kind": kind,
+            "stats": stats,
+        }
+        try:
+            requests.post(f"{self.server_url}/api/result", json=payload, timeout=5)
         except Exception:
             pass  # sunucuya ulaşılamasa da test devam etsin
 

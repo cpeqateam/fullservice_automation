@@ -37,7 +37,11 @@
       "Bash(python -c \"import xml.dom.minidom; xml.dom.minidom.parse\\('../MIMARI.drawio'\\); print\\('drawio XML gecerli'\\)\")",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(python -m py_compile server/db_service.py server/orchestrator.py server/main.py agent/test_executor.py common/protocol.py common/runners/base.py common/runners/ping_runner.py common/runners/iperf_runner.py common/runners/wifi_track_runner.py common/runners/wifi_util.py)",
+      "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); import server.main; import agent.main; from common.runners import registry; from server import db_service; print\\('IMPORT_OK'\\); print\\('db_available:', db_service.db_available\\(\\)\\); print\\('tables:', db_service.T_SESSION, db_service.T_PING, db_service.T_IPERF\\)\")",
+      "Bash(python -m py_compile server/ftp_service.py server/orchestrator.py server/main.py)",
+      "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); import server.main; from server import ftp_service as f; print\\('IMPORT_OK'\\); print\\(f.build_target_dir\\('ZYXEL','EX5601','v1.0', f.test_type_from_filename\\('full_mac_wifi_iperf_20260623.txt'\\),'MAC_WIFI'\\)\\); print\\(f.build_target_dir\\('ZYXEL','EX5601','v1.0', f.test_type_from_kind\\('ping'\\),'WIN_WIFI'\\)\\)\")"
     ]
   }
 }

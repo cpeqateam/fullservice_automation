@@ -36,7 +36,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from common.config import load_config, DASHBOARD_DIR
-from common.protocol import RegisterRequest, ProgressUpdate
+from common.protocol import RegisterRequest, ProgressUpdate, ResultReport
 from common import firmware_db
 from server.orchestrator import Orchestrator
 from server import log_collector
@@ -80,9 +80,18 @@ def progress(upd: ProgressUpdate):
     return {"status": "ok"}
 
 
+@app.post("/api/result")
+def result_report(rep: ResultReport):
+    """Agent'tan gelen nihai test özetini DB'ye (copy_ tablolar) yaz."""
+    orch.record_result(rep.node_id, rep.kind, rep.stats, rep.ftp_file_path)
+    return {"status": "ok"}
+
+
 @app.post("/api/logs/upload")
 def upload_log(node_id: str = Form(...), session_id: str = Form(...), file: UploadFile = File(...)):
     dest = log_collector.save_upload(node_id, session_id, file.filename, file.file)
+    # Sunucuya inen log'u doğru FTP klasör yapısına (arka planda) yükle
+    orch.upload_log_to_ftp(node_id, dest)
     return {"status": "saved", "path": os.path.basename(dest)}
 
 

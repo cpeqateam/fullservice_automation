@@ -39,6 +39,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     MAX_ATTEMPTS = 5      # server (kablolu Mac) henüz dinlemiyor olabilir → yeniden dene
     RETRY_WAIT = 2        # denemeler arası bekleme (sn)
 
+    start_iso = datetime.now().isoformat(timespec="seconds")
     ctx.progress(0.0, TestStatus.RUNNING.value, f"iperf3 → {server}:{params.iperf_port}")
 
     try:
@@ -101,6 +102,18 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         rc = proc.returncode if proc else 1
         status = TestStatus.COMPLETED.value if rc == 0 else TestStatus.ERROR.value
         ctx.progress(100.0, status, summary or ("iperf tamamlandı" if status == "completed" else "iperf hatası — server'a bağlanılamadı"))
+        if ctx.result:
+            snd, rcv = _parse_rates(log_file)
+            ctx.result("iperf", {
+                "server_ip": server,
+                "port": params.iperf_port,
+                "parallel": params.iperf_parallel,
+                "duration": duration,
+                "sender_mbps": snd,
+                "receiver_mbps": rcv,
+                "test_start_time": start_iso,
+                "test_end_time": datetime.now().isoformat(timespec="seconds"),
+            })
         return [log_file]
 
     except Exception as e:
@@ -123,3 +136,32 @@ def _parse_summary(log_file: str) -> str:
     except Exception:
         pass
     return ""
+
+
+def _to_mbps(value: float, unit: str) -> float:
+    """K/M/G bits/sec değerini Mbit/sn'ye normalize eder."""
+    u = unit.upper()
+    if u.startswith("G"):
+        return round(value * 1000, 2)
+    if u.startswith("K"):
+        return round(value / 1000, 2)
+    return round(value, 2)  # Mbits
+
+
+def _parse_rates(log_file: str):
+    """Log sonundaki sender/receiver throughput'unu SAYISAL Mbit/sn olarak döner.
+    Bulunamazsa (None, None)."""
+    snd = rcv = None
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read()
+        for value, unit, role in re.findall(
+                r"([\d.]+)\s*([KMG])bits/sec.*?(sender|receiver)", text):
+            mbps = _to_mbps(float(value), unit)
+            if role == "sender":
+                snd = mbps
+            else:
+                rcv = mbps
+    except Exception as e:
+        print(f"[IPERF] rate parse hatasi: {e}")
+    return snd, rcv

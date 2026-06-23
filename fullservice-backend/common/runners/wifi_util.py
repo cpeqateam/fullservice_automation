@@ -131,22 +131,32 @@ def getOneTimeInfo(wlanInfo, filename):
     writeLogsToFile(log, filename)
 
 
-def sample_once(read_wlan, filename):
-    """Tek bir periyodik örnek satırı: anlık sinyal + sistem bilgisini log'a yazar
-    ve satırı (string) döner. read_wlan: platforma uygun WLAN okuma fonksiyonu."""
+def format_sample_line(signal, systemInfo):
+    """signal + sistem bilgisinden tek bir log satırı (string) üretir.
+    Hem sample_once hem wifi_track_runner bunu kullanır (tek WLAN okumadan
+    hem yazma hem istatistik için)."""
     logString = "----- " + asctime() + SPACER
-
-    try:
-        signal = getSignalInfo(read_wlan())
-    except Exception as e:
-        print(f"[WIFI] readWlan/getSignalInfo hatasi: {e}")
-        signal = []
-
     if signal and any(str(s).strip() for s in signal):
         logString += ", ".join(str(s) for s in signal)
     else:
         logString += "00:00:00:00:00:00, disconnected, 0%, 0, 0, 0, N/A"
     logString += SPACER
+
+    parts = []
+    for s in systemInfo:
+        parts.append(str(s) if isinstance(s, bool) else f"{s}%")
+    logString += ", ".join(parts) + "\n"
+    return logString
+
+
+def sample_once(read_wlan, filename):
+    """Tek bir periyodik örnek satırı: anlık sinyal + sistem bilgisini log'a yazar
+    ve satırı (string) döner. read_wlan: platforma uygun WLAN okuma fonksiyonu."""
+    try:
+        signal = getSignalInfo(read_wlan())
+    except Exception as e:
+        print(f"[WIFI] readWlan/getSignalInfo hatasi: {e}")
+        signal = []
 
     try:
         systemInfo = getSystemInfo()
@@ -154,11 +164,7 @@ def sample_once(read_wlan, filename):
         print(f"[WIFI] getSystemInfo hatasi: {e}")
         systemInfo = ["0", "0", True, 0]
 
-    parts = []
-    for s in systemInfo:
-        parts.append(str(s) if isinstance(s, bool) else f"{s}%")
-    logString += ", ".join(parts) + "\n"
-
+    logString = format_sample_line(signal, systemInfo)
     try:
         writeLogsToFile(logString, filename)
     except Exception as e:

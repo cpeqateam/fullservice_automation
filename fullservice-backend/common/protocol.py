@@ -92,3 +92,17 @@ class ProgressUpdate(BaseModel):
     status: str                # TestStatus değeri
     message: str = ""
     details: Optional[Any] = None
+
+
+# ─────────────────────────────────────────────────────────────
+# Agent → Sunucu: test SONUÇ ÖZETİ (DB'ye yazmak için)
+# ─────────────────────────────────────────────────────────────
+class ResultReport(BaseModel):
+    """Bir test bitince üretilen yapısal özet — sunucu bunu DB'ye (copy_ tablolar)
+    yazar. İlerleme (ProgressUpdate) anlık durum içindi; bu ise nihai istatistik."""
+    node_id: str
+    session_id: str
+    task: str                  # TestType değeri (ör. "ping_modem")
+    kind: str                  # hangi tablo: "ping" | "iperf" | "wifi"
+    stats: Dict[str, Any] = {} # teste özgü özet alanları
+    ftp_file_path: Optional[str] = None

@@ -1,0 +1,136 @@
+==========================================================================
+ FULL SERVIS — PROJE GECMISI / DEVAM NOTLARI  (gecmis.txt)
+==========================================================================
+Bu dosya: chat kapanirsa yeni bir yapay zekaya bastan anlatmamak icin
+yapilanlarin ve siradaki adimlarin kopyala-yapistir ozeti.
+Son guncelleme: 2026-06-23
+
+--------------------------------------------------------------------------
+ PROJE NEDIR
+--------------------------------------------------------------------------
+FULL Servis: 4 makineli dagitik modem stres testi. Hepsi ayni modeme baglanir,
+es zamanli yuk basar (ping/youtube/iperf/torrent/wifi). Modem cokmeden dayanirsa
+firmware basarili sayilir.
+- Linux Sunucu (orkestrator + dashboard, port 8770)  rol: ping, youtube
+- MAC Kablo (iperf SERVER)                            rol: youtube,ping,iperf_server
+- WINDOWS WiFi                                        rol: youtube,ping,torrent,wifi_track
+- MAC WiFi  (iperf CLIENT)                            rol: youtube,ping,iperf,wifi_track
+Kod: fullservice-backend/  (server/, agent/, common/, common/runners/)
+GRK (grk-automation/) = ayri, canli, SALT-OKUNUR referans. ASLA dokunma.
+
+--------------------------------------------------------------------------
+ DB STRATEJISI (KARARLASTIRILDI)
+--------------------------------------------------------------------------
+Eskiden GRK tablolari: grk_firmware, grk_test_session, grk_ping_test,
+grk_speed_test, grk_wifi_analysis, files, grk_users, grk_test_defaults,
+grk_router_logs  (PostgreSQL cpeqadb, SSL sertifikali).
+
+KARAR (Senaryo 3): GRK ile FULL Servis AYNI tablolari paylasacak.
+- grk_ onekleri kalkacak: firmware, test_session, ping_test, speed_test, wifi_analysis
+- her sonuc tablosuna 2 yeni kolon: test_name (GRK / FULL_SERVIS) + node_name
+  (FULL Serviste hangi makine: LINUX/MAC_ETH/MAC_WIFI/WIN_WIFI; GRK'da NULL)
+- test_session'a test_name kolonu (has_full_servis YERINE)
+- yeni tablo: iperf_test (sadece FULL Servis)
+- torrent ve youtube DB'ye YAZILMAZ (sadece yuk basici, log/FTP'de kalir)
+- speed_test FULL Serviste yok (GRK'ya ozel)
+
+GUVENLI YAKLASIM (canary/staging) — SU AN BURADAYIZ:
+GRK'yi hemen riske atmamak icin once basinda copy_ olan kopya tablolar
+olusturuldu. FULL Servis once BUNLARA yazacak. Her sey calisinca asil
+birlestirme (rename + GRK guncelleme) yapilacak.
+Olusturulan staging tablolari (kullanici DB'de CALISTIRDI, 2026-06-23):
+  copy_test_session   (FK firmware_id -> mevcut grk_firmware)
+  copy_ping_test      (FK session_id  -> copy_test_session)
+  copy_speed_test
+  copy_wifi_analysis
+  copy_iperf_test
+NOT: firmware icin copy YOK; combobox hala grk_firmware'i okur (GRK'ya dokunulmadi),
+copy_test_session FK ile grk_firmware'e baglanir.
+
+Diagram dosyalari (repoda):
+  DB_YENI_SEMA.drawio          = hedef birlesik sema (Senaryo 3)
+  DB_BIRLESIK_SEMA_ONERI.drawio= ilk genis oneri (referans)
+  UML_CLASS_DIAGRAM.drawio     = kod sinif/modul diyagrami
+  UML_USECASE_DIAGRAM.drawio   = use-case diyagrami
+
+--------------------------------------------------------------------------
+ SIMDI YAPILAN IS: FULL Servis -> copy_ tablolarina DB YAZMA (2026-06-23)
+--------------------------------------------------------------------------
+Onceden FULL Serviste DB'ye YAZAN kod YOKTU (firmware_db.py sadece combobox
+icin OKUYORDU). Bu adimda yazma entegrasyonu eklendi:
+
+YENI/DEGISEN DOSYALAR:
+  server/db_service.py        (YENI) copy_ tablolarina yazan fonksiyonlar.
+                              En ustte TABLO ADI sabitleri var — birlestirmede
+                              copy_test_session -> test_session vb. yapmak icin
+                              sadece o 6 sabiti degistir.
+  common/protocol.py          + ResultReport modeli (agent -> sunucu sonuc ozeti)
+  common/runners/base.py      RunContext'e result callback eklendi (kind, stats)
+  agent/test_executor.py      test bitince /api/result'a ozet POST eder
+  server/main.py              + POST /api/result endpoint
+  server/orchestrator.py      start_session'da copy_test_session olusturur;
+                              record_result ile ping/iperf/wifi satirlarini yazar;
+                              stop_session'da bitis zamanini gunceller
+  common/runners/ping_runner.py   bitince istatistik (total/success/loss/min/max/
+                                  avg/median/std) hesaplayip ctx.result ile gonderir
+  common/runners/iperf_runner.py  sender/receiver Mbps hesaplayip gonderir
+  common/runners/wifi_track_runner.py  ornekleri toplayip ozet gonderir
+  common/runners/wifi_util.py     + format_sample_line yardimcisi
+
+AKIS: agent runner test biter -> ctx.result(kind, stats) -> /api/result ->
+orchestrator.record_result -> db_service.save_* -> copy_ tablosu.
+Sunucu-yerel testler (Linux) ayni record_result'i dogrudan cagirir.
+DB yoksa (SessionLocal None) her sey sessizce atlanir, testler yine calisir.
+
+test_name her satirda 'FULL_SERVIS'. node_name = config'deki log_name
+(server=LINUX, mac_cable=MAC_ETH, mac_wifi=MAC_WIFI, win_wifi=WIN_WIFI).
+
+--------------------------------------------------------------------------
+ NASIL TEST EDILIR
+--------------------------------------------------------------------------
+1. copy_ tablolari DB'de olusturuldu mu? (olusturuldu)
+2. Sunucuda sertifikalar var mi? fullservice-backend/certs/ (ca.crt, client.crt,
+   client.key). client.key izni: chmod 600 (Linux/mac). Yoksa DB baglanmaz.
+3. Sunucu:  cd fullservice-backend && python run_server.py
+4. Agentlar: her makinede  python run_agent.py <node_id> http://<sunucu_ip>:8770
+5. Dashboard'dan marka/model/firmware sec + FULL Servis Baslat.
+6. DB'de kontrol:
+     SELECT * FROM copy_test_session ORDER BY session_id DESC LIMIT 5;
+     SELECT * FROM copy_ping_test ORDER BY ping_result_id DESC LIMIT 20;
+     SELECT * FROM copy_iperf_test ORDER BY iperf_id DESC LIMIT 5;
+     SELECT * FROM copy_wifi_analysis ORDER BY wifi_summary_id DESC LIMIT 5;
+   Beklenen: test_name='FULL_SERVIS', node_name dolu, firmware_id dogru.
+
+--------------------------------------------------------------------------
+ SIRADAKI ADIMLAR (yapilacaklar)
+--------------------------------------------------------------------------
+[ ] copy_ tablolarina yazma sahada test edilecek (4 makine).
+[x] FTP'ye log yukleme EKLENDI (2026-06-23). server/ftp_service.py (GRK portu).
+    Klasor yapisi: <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
+    TestTipi: Ping/Iperf/Wifi/Youtube/Torrent (log dosya adindan). Bilgisayar:
+    LINUX/MAC_ETH/MAC_WIFI/WIN_WIFI. Klasorler ILK yuklemede otomatik acilir
+    (FTP'de elle klasor acmaya GEREK YOK). Agent loglari: /api/logs/upload sonrasi
+    orch.upload_log_to_ftp; sunucu-yerel loglar: _run_server_local worker'da.
+    Arka planda (daemon thread) yukler. DB ftp_file_path artik FTP hedef klasoru.
+    Devre disi: ortam degiskeni FS_FTP_DISABLE=1. Sunucu certs/ca.crt kullanir.
+    KALAN: sahada FTP yuklemesi dogrulanacak (gercek MARKA/MODEL/FIRMWARE ile).
+[ ] Her sey calisinca BIRLESTIRME:
+      - DB: grk_* tablolarini rename + test_name/node_name ekle + iperf_test
+        (SQL hazirdi, onceki adimda verildi)
+      - GRK kodunu guncelle (grk_firmware->firmware vb.) — bunun icin hazir
+        bir "Claude Code prompt" uretildi (onceki mesajda).
+      - FULL Servis db_service.py'deki TABLO ADI sabitlerini copy_'siz yap.
+      - copy_ tablolarini DROP et.
+[ ] iperf otomasyondan duzgun baslamiyor olabilir — sahada dogrulanacak
+    (IPERF_REHBERI.md bolum B §15 kontrol listesi). iperf3 iki Mac'te de KURULU
+    (2026-06-22 kaynak koddan derlendi, /usr/local/bin/iperf3).
+
+--------------------------------------------------------------------------
+ KURALLAR / NOTLAR
+--------------------------------------------------------------------------
+- grk-automation/ ASLA degistirilmez (canli, salt-okunur referans).
+- certs/ gizli, repoya konmaz (gitignore). client.key chmod 600.
+- Kullanici git push'u KENDI yapar; sadece istenince commit'le.
+- Kullanici Java'dan geliyor, Python'da yeni — kod aciklamalarini ona gore yap.
+- Branch: aliimran.
+==========================================================================
