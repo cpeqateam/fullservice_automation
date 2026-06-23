@@ -113,15 +113,21 @@ def login_qbittorrent(qb_url, username, password):
     """Web UI'ye giriş yapar; başarılıysa requests.Session, değilse None döner."""
     session = requests.Session()
     try:
-        resp = session.post(f"{qb_url}/api/v2/auth/login",
-                            data={"username": username, "password": password},
-                            timeout=10)
+        resp = session.post(
+            f"{qb_url}/api/v2/auth/login",
+            data={"username": username, "password": password},
+            headers={"Referer": qb_url},  # yeni qBittorrent sürümleri Referer zorunlu tutar
+            timeout=10,
+        )
     except Exception as e:
-        print(f"[TORRENT] Web UI'ye baglanilamadi: {e}")
+        print(f"[TORRENT] Web UI'ye baglanilamadi ({qb_url}): {e}")
         return None
-    if resp.ok and resp.text.strip() == "Ok.":
+    text = resp.text.strip()
+    if resp.ok and text == "Ok.":
         return session
-    print(f"[TORRENT] Giris basarisiz: {resp.text}")
+    # Hata detayını logla: "Fails." → şifre yanlış, başka metin → sürüm farkı
+    print(f"[TORRENT] Giris basarisiz — HTTP {resp.status_code}, yanit: '{text}'")
+    print(f"[TORRENT] Kontrol: qBittorrent acik mi? Web UI aktif mi? Sifre dogru mu? Port 8080 mi?")
     return None
 
 

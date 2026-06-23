@@ -141,10 +141,9 @@ def open_terminal_running(argv, title: str = "FULL Servis"):
     Açılamazsa None döner — test arka planda normal devam eder."""
     try:
         if is_windows():
-            # Yeni GÖRÜNÜR cmd penceresi; komut bitince pencere AÇIK kalsın (/k) —
-            # macOS Terminal davranışıyla aynı.
-            return subprocess.Popen(["cmd", "/k"] + [str(a) for a in argv],
-                                    creationflags=CREATE_NEW_CONSOLE)
+            # CMD'nin 'start' komutu yeni görünür pencereyi en güvenilir şekilde açar.
+            args_str = " ".join(str(a) for a in argv)
+            return subprocess.Popen(f'start "{title}" cmd /k {args_str}', shell=True)
         inner = " ".join(shlex.quote(str(a)) for a in argv)
         if is_mac():
             return _osascript_terminal(f"{inner} ; echo ; echo [bitti]")
@@ -159,11 +158,12 @@ def open_log_viewer(log_file: str, title: str = "FULL Servis"):
     Python tarafı log'a yazdıkça pencerede akar. Açılamazsa None döner."""
     try:
         if is_windows():
-            ps = (f"$host.UI.RawUI.WindowTitle='{title}'; "
-                  f"Get-Content -LiteralPath '{log_file}' -Wait -Tail 200")
+            # 'start' ile yeni PowerShell penceresi aç; -NoExit ile açık kalsın.
+            log_esc = log_file.replace('"', '`"')
+            ps = f"Get-Content -LiteralPath \\\"{log_esc}\\\" -Wait -Tail 200"
             return subprocess.Popen(
-                ["powershell", "-NoExit", "-Command", ps],
-                creationflags=CREATE_NEW_CONSOLE,
+                f'start "{title}" powershell -NoExit -Command "{ps}"',
+                shell=True,
             )
         tail = f"tail -n 200 -f {shlex.quote(log_file)}"
         if is_mac():

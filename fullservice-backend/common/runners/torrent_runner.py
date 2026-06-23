@@ -44,9 +44,14 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
 
         session = torrent_util.login_qbittorrent(QB_URL, QB_USER, QB_PASS)
         if not session:
-            ctx.progress(100.0, TestStatus.ERROR.value,
-                         "qBittorrent Web UI'ye giriş yapılamadı (admin/Admin123, :8080?).")
-            log("Web UI giris basarisiz.")
+            msg = (
+                "qBittorrent Web UI'ye giriş yapılamadı. "
+                "Kontrol: 1) qBittorrent açık mı?  "
+                "2) Tools→Options→Web UI: aktif, port 8080, kullanıcı 'admin', şifre 'Admin123'  "
+                "3) 'Bypass authentication for localhost' KAPALI olmalı"
+            )
+            ctx.progress(100.0, TestStatus.ERROR.value, msg)
+            log(f"Web UI giris basarisiz. {msg}")
             return [log_file]
 
         # Bu kadar bayt inince hepsini silip yeniden başla (disk dolmasın + sürekli yük).
