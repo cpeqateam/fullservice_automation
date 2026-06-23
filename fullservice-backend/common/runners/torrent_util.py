@@ -137,9 +137,9 @@ def login_qbittorrent(qb_url, username, password):
         print(f"[TORRENT] Web UI'ye baglanilamadi ({qb_url}): {e}")
         return None
     text = resp.text.strip()
-    if resp.ok and text == "Ok.":
+    # qBittorrent 4.x → "Ok.", 5.x → HTTP 204 boş body; ikisini de kabul et
+    if resp.ok and (text.lower() in ("ok.", "ok", "") or resp.status_code == 204):
         return session
-    # Hata detayını logla: "Fails." → şifre yanlış, başka metin → sürüm farkı
     print(f"[TORRENT] Giris basarisiz — HTTP {resp.status_code}, yanit: '{text}'")
     print(f"[TORRENT] Kontrol: qBittorrent acik mi? Web UI aktif mi? Sifre dogru mu? Port 8080 mi?")
     return None
