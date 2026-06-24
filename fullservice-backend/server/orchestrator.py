@@ -36,6 +36,11 @@ class Orchestrator:
         self.server_lan_ip = config.get("server", {}).get("lan_ip") or detect_lan_ip()
         self._lock = threading.RLock()
 
+        try:
+            import psutil as _psutil
+            _boot_iso = datetime.fromtimestamp(_psutil.boot_time()).isoformat(timespec="seconds")
+        except Exception:
+            _boot_iso = datetime.now().isoformat(timespec="seconds")
         # node_id -> runtime durum
         self.nodes: dict[str, dict] = {}
         for n in config.get("nodes", []):
@@ -49,8 +54,12 @@ class Orchestrator:
                 "ip": self.server_lan_ip if is_server else None,
                 "agent_port": None,
                 "platform": "Linux" if is_server else None,
-                "online": is_server,           # sunucu kendisi her zaman "online"
+                "online": is_server,
                 "last_seen": None,
+                # server node'u kendi başlangıç zamanını bilir; agent node'ları
+                # ilk heartbeat gelince first_seen_at alır (agent restart gerekmez)
+                "agent_started_at": _boot_iso if is_server else None,
+                "first_seen_at": _boot_iso if is_server else None,
                 "tests": {r: self._blank_test() for r in n.get("roles", [])},
             }
 
@@ -85,6 +94,11 @@ class Orchestrator:
             node["platform"] = req.get("platform")
             node["online"] = True
             node["last_seen"] = datetime.now().isoformat(timespec="seconds")
+            # agent_started_at: yeni agent kodu gönderirse kullan; yoksa first_seen_at fallback
+            if req.get("agent_started_at"):
+                node["agent_started_at"] = req["agent_started_at"]
+            if not node.get("first_seen_at"):
+                node["first_seen_at"] = datetime.now().isoformat(timespec="seconds")
 
     # ── İlerleme güncelleme (agent push + sunucu-yerel) ──────
     def update_progress(self, node_id: str, task: str, progress: float,
@@ -130,6 +144,7 @@ class Orchestrator:
             "agent_port": node.get("agent_port"),
             "online": online,
             "last_seen": node.get("last_seen"),
+            "agent_started_at": node.get("agent_started_at") or node.get("first_seen_at"),
             "roles": node.get("roles", []),
             "tests": node.get("tests", {}),
         }
@@ -164,8 +179,9 @@ class Orchestrator:
                 # iperf server artık kablolu Mac'te (iperf_server rolü) koşuyor;
                 # client (wifi Mac) bu adrese bağlanır.
                 iperf_server=self._iperf_server_ip(),
-                iperf_port=int(self.defaults.get("iperf_port", 5201)),
-                iperf_parallel=int(self.defaults.get("iperf_parallel", 4)),
+                iperf_port=int(overrides.get("iperf_port") or self.defaults.get("iperf_port", 5201)),
+                iperf_parallel=int(overrides.get("iperf_parallel") or self.defaults.get("iperf_parallel", 10)),
+                iperf_reverse=bool(overrides.get("iperf_reverse", False)),
                 torrent_magnet=overrides.get("torrent_magnet") or self.defaults.get("torrent_magnet", ""),
                 torrent_recycle_gb=float(self.defaults.get("torrent_recycle_gb", 5)),
                 duration=int(overrides.get("duration") or self.defaults.get("duration", 60)),

@@ -56,6 +56,13 @@
             </div>
           </div>
         </div>
+
+        <!-- Uptime satırı -->
+        <div class="uptime-row mt-2">
+          <v-icon size="13" class="info-ic mr-1">mdi-clock-outline</v-icon>
+          <span class="info-label mr-1">Uptime:</span>
+          <span class="uptime-val" :class="appStore.health.run ? uptimeClass(n) : ''">{{ appStore.health.run ? uptimeText(n) : '—' }}</span>
+        </div>
       </div>
 
       <p v-if="!appStore.nodes.length" class="text-caption text-medium-emphasis text-center py-4">
@@ -114,15 +121,15 @@ function stateClass(nodeId) {
 function stateText(nodeId) {
   const r = result(nodeId)
   if (!r) return appStore.health.running ? 'kontrol…' : '—'
-  return r.reachable ? 'Bağlı' : 'Yok'
+  return r.reachable ? 'ÇEVRİMİÇİ' : 'ÇEVRİMDIŞI'
 }
 
 // "Bağlantı Durumu" hücresi için daha açıklayıcı metin
 function connStatusText(nodeId) {
   const r = result(nodeId)
   if (!r) return appStore.health.running ? 'Kontrol ediliyor…' : 'Bilinmiyor'
-  if (!r.reachable) return 'Bağlı değil'
-  return r.latency_ms != null ? `Bağlı · ${r.latency_ms} ms` : 'Bağlı'
+  if (!r.reachable) return 'ÇEVRİMDIŞI'
+  return r.latency_ms != null ? `ÇEVRİMİÇİ · ${r.latency_ms} ms` : 'ÇEVRİMİÇİ'
 }
 
 // İşletim sistemini insan-okunur ada çevirir (platform: "Linux"|"Darwin"|"Windows")
@@ -143,6 +150,26 @@ function connMethodIcon(n) {
   if (n.conn === 'wifi') return 'mdi-wifi'
   if (n.conn === 'cable') return 'mdi-ethernet'
   return 'mdi-help-network'
+}
+
+function uptimeMinutes(n) {
+  if (!n.agent_started_at) return null
+  try {
+    const ms = Date.now() - new Date(n.agent_started_at).getTime()
+    return Math.floor(ms / 60000)
+  } catch { return null }
+}
+function uptimeText(n) {
+  const m = uptimeMinutes(n)
+  if (m === null) return '—'
+  if (m < 60) return `${m} dakikadır açık.`
+  const h = Math.floor(m / 60), rem = m % 60
+  return `${h} sa ${rem} dakikadır açık.`
+}
+function uptimeClass(n) {
+  const m = uptimeMinutes(n)
+  if (m === null) return ''
+  return m >= 45 ? 'uptime-warn' : 'uptime-ok'
 }
 
 function onHealthCheck() {
@@ -185,38 +212,45 @@ function onHealthCheck() {
 .node-block {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  border-radius: 10px;
+  padding: 7px 10px;
+  margin-bottom: 7px;
   &:last-child { margin-bottom: 4px; }
 }
 .node-top {
-  display: flex; align-items: center; gap: 9px;
-  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 6px;
 }
-.node-name { font-size: 13px; font-weight: 600; }
-.node-state { font-size: 12px; font-weight: 600; }
+.node-name { font-size: 12px; font-weight: 600; }
+.node-state { font-size: 11px; font-weight: 600; }
 
-// 2×2 ızgara: 2 yan yana, 2 de altında yan yana
 .info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 10px;
+  gap: 5px 8px;
 }
 .info-cell {
-  display: flex; align-items: flex-start; gap: 6px;
+  display: flex; align-items: flex-start; gap: 4px;
   min-width: 0;
 }
-.info-ic { opacity: 0.45; margin-top: 2px; }
+.info-ic { opacity: 0.45; margin-top: 1px; }
 .info-text { display: flex; flex-direction: column; min-width: 0; }
 .info-label {
-  font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  font-size: 8.5px; letter-spacing: 0.04em; text-transform: uppercase;
   opacity: 0.45;
 }
 .info-value {
-  font-size: 12px; font-weight: 500;
+  font-size: 11px; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+.uptime-row {
+  display: flex; align-items: center;
+  font-size: 10.5px; margin-top: 5px;
+}
+.uptime-val { font-weight: 700; font-size: 11px; }
+.uptime-ok   { color: #30D158; }
+.uptime-warn { color: #FF453A; }
 
 .sp-footer { flex-shrink: 0; }
 

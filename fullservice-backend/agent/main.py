@@ -17,6 +17,10 @@ import platform
 import socket
 import threading
 import time
+from datetime import datetime
+import psutil
+
+AGENT_START_ISO = datetime.fromtimestamp(psutil.boot_time()).isoformat(timespec="seconds")
 
 # UTF-8 olmayan konsollarda (özellikle Windows agent) print()'in çökmemesi için — GRK ile aynı
 for _stream in (sys.stdout, sys.stderr):
@@ -77,6 +81,7 @@ def _register_loop():
         "platform": platform.system(),
         "ip": LAN_IP,
         "agent_port": AGENT_PORT,
+        "agent_started_at": AGENT_START_ISO,
     }
     first = True
     while True:

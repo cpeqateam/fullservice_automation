@@ -54,7 +54,8 @@ export const useAppStore = defineStore('app', {
 
     // Cihaz bilgisi (Günlük Rutin Kontrol formu)
     deviceInfo: { brand: null, model: null, firmware: null },
-    overrides:  { duration: '', modem_ip: '', internet_ip: '', youtube_link: '' },
+    overrides:  { duration: 54000, modem_ip: '', internet_ip: '', youtube_link: '' },
+    iperfParams: { direction: 'reverse', parallel: 10, port: 5201 },
 
     // Firmware DB
     brandsData:      [],     // [{ title, value, models: [...] }]
@@ -176,6 +177,11 @@ export const useAppStore = defineStore('app', {
       if (o.internet_ip)  body.internet_ip  = o.internet_ip.trim()
       if (o.youtube_link) body.youtube_link = o.youtube_link.trim()
 
+      const ip = this.iperfParams
+      body.iperf_reverse  = ip.direction === 'reverse'
+      body.iperf_parallel = parseInt(ip.parallel)
+      body.iperf_port     = parseInt(ip.port)
+
       const d = this.deviceInfo
       if (d.brand)    body.brand    = d.brand
       if (d.model)    body.model    = d.model
@@ -202,7 +208,8 @@ export const useAppStore = defineStore('app', {
       this.stopHealthCheck()
       this.health = { run: false, running: false, checkedAt: null, results: {} }
       this.deviceInfo = { brand: null, model: null, firmware: null }
-      this.overrides = { duration: '', modem_ip: '', internet_ip: '', youtube_link: '' }
+      this.overrides = { duration: 54000, modem_ip: '', internet_ip: '', youtube_link: '' }
+      this.iperfParams = { direction: 'reverse', parallel: 10, port: 5201 }
       this.firmwareOptions = []
       await this.refresh()
     },

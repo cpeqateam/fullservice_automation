@@ -57,6 +57,9 @@ class SessionStartRequest(BaseModel):
     internet_ip: Optional[str] = None
     youtube_link: Optional[str] = None
     duration: Optional[int] = None
+    iperf_parallel: Optional[int] = None
+    iperf_port: Optional[int] = None
+    iperf_reverse: Optional[bool] = None
     # Cihaz bilgisi (Günlük Rutin Kontrol formundan) — log/dashboard için
     brand: Optional[str] = None
     model: Optional[str] = None

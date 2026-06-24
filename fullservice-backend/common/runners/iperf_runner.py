@@ -3,7 +3,7 @@ iperf3 client çalıştırıcı — wifi Mac düğümünde çalışır, kablolu 
 iperf3 server'a (iperf_server rolü) bağlanıp hattı doldurarak modeme yük
 bindirir ("abanma"). Trafik iki Mac arasında modem üzerinden akar.
 
-Komut:  iperf3 -c <iperf_server> -p <port> -t <duration> -P <parallel>
+Komut:  iperf3 -c <iperf_server> -p <port> -t <duration> -P <parallel> [-R]
 Çıktı log dosyasına yazılır; süre boyunca canlı ilerleme bildirilir; bitince
 özet (toplam throughput) mesaja eklenir. iperf3 kurulu değilse anlaşılır hata verir.
 
@@ -35,6 +35,8 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     duration = max(1, int(params.duration))
     cmd = ["iperf3", "-c", server, "-p", str(params.iperf_port),
            "-t", str(duration), "-P", str(params.iperf_parallel)]
+    if params.iperf_reverse:
+        cmd.append("-R")
 
     MAX_ATTEMPTS = 5      # server (kablolu Mac) henüz dinlemiyor olabilir → yeniden dene
     RETRY_WAIT = 2        # denemeler arası bekleme (sn)

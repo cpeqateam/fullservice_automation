@@ -55,13 +55,13 @@ const dotClass = computed(() => {
 const stateText = computed(() => {
   if (!appStore.health.run) return 'kontrol bekleniyor'
   if (!hc.value) return appStore.health.running ? 'kontrol…' : '—'
-  return hc.value.reachable ? 'online' : 'offline'
+  return hc.value.reachable ? 'ÇEVRİMİÇİ' : 'ÇEVRİMDIŞI'
 })
 
 const connIcon = computed(() => (props.node.conn === 'wifi' ? 'mdi-wifi' : props.node.conn === 'cable' ? 'mdi-ethernet' : 'mdi-server'))
 const metaText = computed(() => {
   const parts = [props.node.platform, props.node.ip].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'bağlı değil'
+  return parts.length ? parts.join(' · ') : 'çevrimdışı'
 })
 </script>
 

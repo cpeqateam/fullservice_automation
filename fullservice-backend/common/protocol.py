@@ -54,6 +54,7 @@ class RegisterRequest(BaseModel):
     platform: str              # "Windows" | "Darwin" | "Linux"
     ip: str                    # agent'ın LAN IP'si (sunucu komut göndermek için kullanır)
     agent_port: int            # agent'ın dinlediği port
+    agent_started_at: Optional[str] = None  # agent process başlangıç zamanı (ISO)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -66,7 +67,8 @@ class TestParams(BaseModel):
     youtube_link: str = ""
     iperf_server: str = ""     # Client Mac buraya bağlanır = iperf server rolündeki (kablolu) Mac'in LAN IP'si
     iperf_port: int = 5201
-    iperf_parallel: int = 4
+    iperf_parallel: int = 10
+    iperf_reverse: bool = False
     torrent_magnet: str = ""   # Windows torrent testi için magnet link (qBittorrent'e eklenir)
     torrent_recycle_gb: float = 5  # bu kadar GB inince hepsini silip yeniden başlat (0 = sadece %100'de sil)
     duration: int = 60         # saniye (ping paket sayısı / test süresi)
