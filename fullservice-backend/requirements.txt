@@ -18,6 +18,11 @@ selenium
 sqlalchemy
 psycopg2-binary
 
-# Faz 5 (FTP + Excel) için GRK'dan gelecek ek bağımlılıklar:
-# openpyxl
-# xlsxwriter
+# Excel raporları (ping istatistik+grafik, wifi özet+grafik). Yalnızca SUNUCUDA
+# (server/excel_service.py) kullanılır; import'lar lazy olduğu için bu paketler
+# olmayan bir agent yine çalışır (sadece Excel üretilmez).
+openpyxl
+xlsxwriter
+pandas
+numpy
+matplotlib

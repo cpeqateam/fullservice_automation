@@ -26,6 +26,7 @@ from common.runners.base import RunContext
 from common.runners.registry import get_runner
 from server import db_service
 from server import ftp_service
+from server import excel_service
 
 
 class Orchestrator:
@@ -279,7 +280,12 @@ class Orchestrator:
     def upload_log_to_ftp(self, node_id: str, file_path: str):
         """Bir log dosyasını FTP'ye, doğru klasör yapısına (arka planda) yükler:
         <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
-        Test tipi dosya adından, bilgisayar node'un log adından çözülür."""
+        Test tipi dosya adından, bilgisayar node'un log adından çözülür.
+
+        Ping ve Wifi logları için ek olarak GRK formatında bir Excel raporu üretilir
+        (ping: istatistik+grafik, wifi: özet+10 grafik) ve aynı klasöre txt ile
+        birlikte yüklenir. Excel üretimi + yükleme tek bir arka plan thread'inde
+        yapılır (matplotlib yavaş olabilir; HTTP yanıtını/worker'ı bloke etmesin)."""
         if not file_path:
             return
         dev = self.session.get("device", {})
@@ -287,7 +293,23 @@ class Orchestrator:
         test_type = ftp_service.test_type_from_filename(os.path.basename(file_path))
         target = ftp_service.build_target_dir(
             dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
-        ftp_service.upload_async([file_path], target)
+
+        def _work():
+            files = [file_path]
+            try:
+                if test_type == "Ping":
+                    xlsx = excel_service.ping_log_to_excel(file_path)
+                    if xlsx:
+                        files.append(xlsx)
+                elif test_type == "Wifi":
+                    xlsx = excel_service.wifi_log_to_excel(file_path)
+                    if xlsx:
+                        files.append(xlsx)
+            except Exception as e:
+                print(f"[ORCH] {test_type} Excel uretilemedi: {e}")
+            ftp_service.upload_files_to_ftp(files, target)
+
+        threading.Thread(target=_work, daemon=True).start()
 
     def _send_start(self, nv: dict, session_id: str, roles: list, params: TestParams) -> bool:
         url = f"http://{nv['ip']}:{nv['agent_port']}/start"
