@@ -166,6 +166,12 @@ GRK'daki bildirimin AYNISI eklendi:
   eklendi (SessionStartRequest + orchestrator session.device + app.js startTest).
 - Devre disi: ortam degiskeni FS_NOTIFY_DISABLE=1.
 - npm run build YAPILDI.
+- !!! SIRLAR (telegram token / smtp sifresi) KODDA DEGIL. fullservice-backend/
+  secrets.json (gitignore'lu) veya ortam degiskenlerinden okunur:
+  FS_TELEGRAM_BOT_TOKEN, FS_TELEGRAM_CHAT_ID, FS_SMTP_USER, FS_SMTP_PASS, FS_SMTP_FROM.
+  Sunucuda bu dosyayi olustur (certs/ gibi repoya GITMEZ). common.config.get_secret().
+  Bir kez yanlislikla GitHub'a gitti -> commit secret'siz yeniden yazilip force-push
+  edildi; YINE DE token+smtp sifresi YENILENMELI (GitHub gormus kabul edilir).
 
 ERROR_LOG (2026-06-29 #4): GRK gibi error_log uretilip FTP'ye gider (BILDIRIM YOK).
 - server/main.py: stdout/stderr → logs/app.log Tee'si (tum print/traceback dosyada).
