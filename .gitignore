@@ -15,6 +15,8 @@ logs/
 
 # Sırlar (firmware DB / FTP sertifikaları — repoya asla konmaz)
 certs/
+secrets.json
+*.secrets.json
 
 # OS / editör
 .DS_Store

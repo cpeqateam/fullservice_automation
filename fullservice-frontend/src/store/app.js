@@ -10,6 +10,7 @@ import {
   fetchState, startSession, stopSession, resetSession,
   healthCheck, getBrands, getVersions,
 } from '@/services/api'
+import { useAuthStore } from '@/store/auth'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AŞAMALI HEALTH-CHECK PLANI (kullanıcı isteri)
@@ -186,6 +187,13 @@ export const useAppStore = defineStore('app', {
       if (d.brand)    body.brand    = d.brand
       if (d.model)    body.model    = d.model
       if (d.firmware) body.firmware = d.firmware
+
+      // Giriş yapan kullanıcı — bildirim (Telegram/mail) mesajında gösterilir
+      const u = useAuthStore().user
+      if (u) {
+        if (u.name)    body.user_name    = u.name
+        if (u.surname) body.user_surname = u.surname
+      }
 
       const res = await startSession(body)
       await this.refresh()

@@ -147,6 +147,35 @@ test_name her satirda 'FULL_SERVIS'. node_name = config'deki log_name
    npm run build YAPILDI.
 
 --------------------------------------------------------------------------
+ TELEGRAM + MAIL BILDIRIMI (2026-06-29 #3)
+--------------------------------------------------------------------------
+GRK'daki bildirimin AYNISI eklendi:
+- server/notify.py        = GRK notify.py birebir (AYNI bot + AYNI grup CHAT_ID).
+- server/email_sender.py  = GRK __sendEmail.py portu (AYNI Gmail SMTP hesabi).
+- server/notification_service.py = test bitince:
+    * Telegram (ayni grup): tamamlanma mesaji (GRK formati, "FULL Servis Gorevimiz
+      Tamamlandi...") + oturumun TUM ozet log dosyalari (50MB ustu gonderilmez).
+    * Mail (ayni TO/CC adresleri): YALNIZCA mesaj, DOSYA EKI YOK.
+- Tetikleme (DUZELTILDI 2026-06-29 #4): STOP butonuna DEGIL, testin BITMESINE bagli.
+  update_progress icinde kenar-yakalama: tum testler terminal (completed/error/
+  stopped) olunca _on_session_complete bir kez tetiklenir (running'e bakilmaz cunku
+  torrent sonsuz → ancak /stop sonrasi terminal olur; session_id varligi yeter).
+  Her yeni "Baslat" yeni session_id → her kosu yeniden bildirir (dedup KALDIRILDI).
+  Bildirim arka planda GRACE_SECONDS=10 bekleyip loglari toplar.
+- Kullanici adi: start payload'a frontend auth.user'dan user_name/user_surname
+  eklendi (SessionStartRequest + orchestrator session.device + app.js startTest).
+- Devre disi: ortam degiskeni FS_NOTIFY_DISABLE=1.
+- npm run build YAPILDI.
+
+ERROR_LOG (2026-06-29 #4): GRK gibi error_log uretilip FTP'ye gider (BILDIRIM YOK).
+- server/main.py: stdout/stderr → logs/app.log Tee'si (tum print/traceback dosyada).
+- orchestrator start_session app.log offset'ini kaydeder (session.log_offset).
+- Test bitince server/log_capture.finalize_async: app.log[offset:EOF] dilimini
+  FULL_Service_errorlog_<brand>_<model>_<fw>_<ts>.log olarak yazip FTP'ye yukler:
+  <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/Errorlog/  (makine alt klasoru yok).
+  NOT: bu dilim SUNUCU taraf loglaridir; agent hatalari kendi konsolunda.
+
+--------------------------------------------------------------------------
  SIRADAKI ADIMLAR (yapilacaklar)
 --------------------------------------------------------------------------
 [ ] copy_ tablolarina yazma sahada test edilecek (4 makine).

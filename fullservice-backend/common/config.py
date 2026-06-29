@@ -39,6 +39,28 @@ DASHBOARD_DIR = _FRONTEND_DIST if os.path.isdir(_FRONTEND_DIST) else _LOCAL_DIST
 CERT_DIR = os.path.join(_BASE_DIR, "certs")
 
 
+# Sırlar (Telegram token, SMTP şifresi vb.) — ASLA repoya konmaz. Önce ortam
+# değişkeni, yoksa gitignore'lu secrets.json'dan okunur. Hiçbiri yoksa boş döner.
+_SECRETS_PATH = os.path.join(_BASE_DIR, "secrets.json")
+_secrets_cache: dict | None = None
+
+
+def get_secret(key: str, default: str = "") -> str:
+    """Sır değerini getirir: önce ortam değişkeni, sonra secrets.json, sonra default."""
+    val = os.environ.get(key)
+    if val:
+        return val
+    global _secrets_cache
+    if _secrets_cache is None:
+        try:
+            with open(_SECRETS_PATH, "r", encoding="utf-8") as f:
+                _secrets_cache = json.load(f)
+        except Exception:
+            _secrets_cache = {}
+    v = _secrets_cache.get(key, default)
+    return v if v is not None else default
+
+
 def load_config() -> dict:
     """config.json'u okuyup dict döner. Dosya yoksa makul varsayılanlarla çalışır."""
     try:

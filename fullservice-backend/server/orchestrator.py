@@ -26,6 +26,8 @@ from common.runners.base import RunContext
 from common.runners.registry import get_runner
 from server import db_service
 from server import ftp_service
+from server import notification_service
+from server import log_capture
 from server import excel_service
 
 
@@ -100,13 +102,29 @@ class Orchestrator:
             if not node.get("first_seen_at"):
                 node["first_seen_at"] = datetime.now().isoformat(timespec="seconds")
 
+    _TERMINAL = {"completed", "error", "stopped"}
+
+    def _all_tests_terminal(self) -> bool:
+        """Rolü olan tüm testler bitiş durumunda mı (completed/error/stopped)?"""
+        has_any = False
+        for node in self.nodes.values():
+            for r in node.get("roles", []):
+                has_any = True
+                if node["tests"].get(r, {}).get("status") not in self._TERMINAL:
+                    return False
+        return has_any
+
     # ── İlerleme güncelleme (agent push + sunucu-yerel) ──────
     def update_progress(self, node_id: str, task: str, progress: float,
                         status: str, message: str = ""):
+        fire = None
         with self._lock:
             node = self.nodes.get(node_id)
             if not node:
                 return
+            # Bu güncellemeden ÖNCE ve SONRA "hepsi bitti mi" — kenar (transition)
+            # yakala: yalnızca son testi bitiren güncellemede bir kez tetiklensin.
+            before = self._all_tests_terminal()
             if task not in node["tests"]:
                 node["tests"][task] = self._blank_test()
             t = node["tests"][task]
@@ -114,6 +132,37 @@ class Orchestrator:
             t["status"] = status
             t["message"] = message
             t["updated"] = datetime.now().isoformat(timespec="seconds")
+            after = self._all_tests_terminal()
+
+            # Test bittiğinde (tüm testler terminal) — kenar yakalama ile bir kez.
+            # running'e bakMIYORUZ: torrent gibi sonsuz testler ancak /stop sonrası
+            # terminal olur ve o an running zaten False'tur. session_id varsa (gerçek
+            # bir koşu) tetikle; yeni "Başlat" yeni session_id → her koşu yeniden bildirir.
+            if self.session.get("session_id") and not before and after:
+                fire = {
+                    "device":     dict(self.session.get("device", {})),
+                    "session_id": self.session.get("session_id"),
+                    "started_at": self.session.get("started_at"),
+                    "log_offset": self.session.get("log_offset", 0),
+                }
+
+        if fire:
+            self._on_session_complete(fire)
+
+    def _on_session_complete(self, info: dict):
+        """Test bitince (lock dışında): Telegram+mail bildirimi VE error_log'u FTP'ye."""
+        # 1) Telegram (mesaj + loglar) + mail (sadece mesaj)
+        try:
+            notification_service.send_completion(
+                info["device"], info["session_id"], info["started_at"])
+        except Exception as e:
+            print(f"[ORCH] Bildirim baslatilamadi: {e}")
+        # 2) error_log dilimini FTP'ye yükle (bildirim YOK — sadece hata görünürlüğü)
+        try:
+            log_capture.finalize_async(
+                info["device"], info["session_id"], info["started_at"], info["log_offset"])
+        except Exception as e:
+            print(f"[ORCH] error_log gonderilemedi: {e}")
 
     # ── Dashboard durum çıktısı ──────────────────────────────
     def get_state(self) -> dict:
@@ -201,7 +250,14 @@ class Orchestrator:
                     "brand":    overrides.get("brand"),
                     "model":    overrides.get("model"),
                     "firmware": overrides.get("firmware"),
+                    # Bildirim (Telegram/mail) mesajında kullanılan ek bilgiler
+                    "user_name":    overrides.get("user_name", ""),
+                    "user_surname": overrides.get("user_surname", ""),
+                    "server":       "FULL Servis",
+                    "duration":     params.duration,
                 },
+                # error_log için: app.log'un bu oturum başındaki byte konumu
+                "log_offset": log_capture.current_size(),
             }
             # Tüm test durumlarını sıfırla
             for node in self.nodes.values():
@@ -407,6 +463,8 @@ class Orchestrator:
                     requests.post(f"http://{nv['ip']}:{nv['agent_port']}/stop", timeout=5)
                 except Exception:
                     pass
+        # NOT: Bildirim burada GÖNDERİLMEZ. Test "bittiğinde" (tüm testler terminal)
+        # update_progress içinden _on_session_complete tetiklenir.
         return {"status": "stopped"}
 
     def reset_session(self) -> dict:
@@ -415,7 +473,7 @@ class Orchestrator:
         oturum bilgisini ve tüm düğümlerin test ilerlemelerini sıfırlar. (Bağlantı
         ışıkları/health-check durumu frontend'de tutulur; o da orada sıfırlanır.)
         """
-        # Önce çalışanları durdur (agent'lara /stop + sunucu-yerel)
+        # Önce çalışanları durdur (agent'lara /stop + sunucu-yerel).
         try:
             self.stop_session()
         except Exception as e:

@@ -35,9 +35,33 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from common.config import load_config, DASHBOARD_DIR
+from common.config import load_config, DASHBOARD_DIR, LOGS_DIR
 from common.protocol import RegisterRequest, ProgressUpdate, ResultReport
 from common import firmware_db
+
+
+# ── app.log Tee: tüm print/stderr çıktısını logs/app.log'a da yaz ──────────────
+# error_log (log_capture) test aralığını byte-offset ile bu dosyadan dilimler.
+class _Tee:
+    def __init__(self, stream, fh):
+        self._stream, self._fh = stream, fh
+    def write(self, data):
+        try: self._stream.write(data)
+        except Exception: pass
+        try: self._fh.write(data); self._fh.flush()
+        except Exception: pass
+    def flush(self):
+        try: self._stream.flush()
+        except Exception: pass
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+try:
+    _app_log_fh = open(os.path.join(LOGS_DIR, "app.log"), "a", encoding="utf-8", errors="replace")
+    sys.stdout = _Tee(sys.stdout, _app_log_fh)
+    sys.stderr = _Tee(sys.stderr, _app_log_fh)
+except Exception as _e:
+    print(f"[MAIN] app.log Tee kurulamadi: {_e}")
 from server.orchestrator import Orchestrator
 from server import log_collector
 from server import auth_service
@@ -66,6 +90,9 @@ class SessionStartRequest(BaseModel):
     brand: Optional[str] = None
     model: Optional[str] = None
     firmware: Optional[str] = None
+    # Bildirim mesajında gösterilecek kullanıcı (giriş yapan)
+    user_name: Optional[str] = None
+    user_surname: Optional[str] = None
 
 
 @app.get("/health")
