@@ -14,18 +14,24 @@ Frontend (Vue 3 + Vuetify 3): kardeş klasör [`../fullservice-frontend/`](../fu
         │  • Düğüm registry + merkezi progress         │
         │  • /api/session/start  → tüm düğümlere fan-out│
         │  • /api/state          → dashboard polling   │
-        │  • /api/logs/upload    → log toplama         │
-        │  • iperf3 server                             │
+        │  • /api/logs/upload + /api/result → log/DB/FTP│
         │  • Yerel testler: ping, youtube              │
         └──┬──────────────┬──────────────┬────────────┘
    HTTP    │              │              │
-        ┌──▼─┐         ┌──▼─┐         ┌──▼─┐
-        │MAC │         │WIN │         │MAC │   listener=agent (FastAPI :7531)
-        │kbl │         │WiFi│         │WiFi│
-        └────┘         └────┘         └────┘
+        ┌──▼──┐        ┌──▼─┐         ┌──▼──┐
+        │MAC  │        │WIN │         │MAC  │   listener=agent (FastAPI :7531)
+        │kablo│        │WiFi│         │WiFi │
+        │iperf│◄───────┼────┼─────────│iperf│   iperf3: kablolu Mac -s (server),
+        │ -s  │        │    │         │ -c  │              Wi-Fi Mac -c (client)
+        └─────┘        └────┘         └─────┘
 ```
 
-Detaylı akış için repo kökündeki [`MIMARI.md`](../MIMARI.md).
+> **iperf topolojisi:** Linux sunucu artık iperf server **DEĞİL**. Kablolu Mac
+> `iperf3 -s` (server), Wi-Fi Mac client olur; trafik iki Mac arasında modem üzerinden akar.
+
+Mevcut durum + sıradaki adımlar için repo kökündeki
+[`GELISTIRME_GUNLUGU.md`](../GELISTIRME_GUNLUGU.md); kod gezisi için
+[`KOD_HAKIMIYETI.md`](../KOD_HAKIMIYETI.md).
 
 ## Klasör yapısı
 
@@ -36,24 +42,31 @@ fullservice-backend/
 ├── run_server.py            # python run_server.py
 ├── run_agent.py             # python run_agent.py <node_id> [server_url] [port]
 ├── common/                  # ortak: protokol + cross-platform test runner'lar
-│   ├── config.py            #   config.json okuyucu, dashboard path, LAN IP tespiti
-│   ├── protocol.py          #   sunucu↔agent HTTP sözleşmesi (pydantic)
+│   ├── config.py            #   config.json okuyucu, dashboard path, LAN IP, get_secret
+│   ├── protocol.py          #   sunucu↔agent HTTP sözleşmesi (pydantic) + ResultReport
+│   ├── firmware_db.py       #   Marka/Model/Firmware okuma (PostgreSQL/SSL)
 │   └── runners/             #   her test tipi için ayrı runner modülü
-│       ├── base.py          #     ortak: RunContext, ProgressCb, NO_WINDOW
-│       ├── ping_runner.py   #     ping_internet + ping_modem
-│       ├── youtube_runner.py
-│       ├── iperf_runner.py
-│       ├── torrent_runner.py     (Faz 4: simülasyon)
-│       ├── wifi_track_runner.py  (Faz 4: simülasyon)
+│       ├── base.py          #     RunContext, ProgressCb, grk_style_filename, terminal yard.
+│       ├── ping_runner.py   #     ping_internet + ping_modem (istatistik → DB)
+│       ├── youtube_runner.py (+youtube_util.py)
+│       ├── iperf_runner.py        #  iperf3 -c (client)
+│       ├── iperf_server_runner.py #  iperf3 -s (server)
+│       ├── torrent_runner.py (+torrent_util.py)   # qBittorrent Web API (gerçek)
+│       ├── wifi_track_runner.py (+wifi_util.py / wifi_util_mac.py)  # gerçek WLAN
 │       └── registry.py      #     TestType → runner eşlemesi
 ├── agent/                   # Mac/Windows client uygulaması (FastAPI)
 │   ├── main.py              #   /start, /stop, /health + registration loop
-│   └── test_executor.py     #   thread'li runner yürütücüsü + push/upload
+│   └── test_executor.py     #   thread'li runner yürütücüsü + push/upload + /api/result
 └── server/                  # Linux orkestratör (FastAPI)
-    ├── main.py              #   tüm /api/* endpoint'leri
+    ├── main.py              #   tüm /api/* endpoint'leri + stdout→app.log Tee
     ├── orchestrator.py      #   registry + aggregator + fan-out + yerel testler
-    ├── iperf_server.py      #   iperf3 -s yaşam döngüsü
-    └── log_collector.py     #   yüklenen logları logs/<session>/<node>/ altına yazar
+    ├── auth_service.py      #   login (cpeteam varsayılan + grk_users)
+    ├── db_service.py        #   sonuçları copy_ tablolarına yazar
+    ├── ftp_service.py       #   logları FTP klasör yapısına yükler
+    ├── notify.py / email_sender.py / notification_service.py  # Telegram + mail bildirimi
+    ├── log_capture.py       #   error_log dilimi → FTP
+    ├── excel_service.py     #   Ping/Wifi için Excel
+    └── log_collector.py     #   yüklenen logları logs/<node>/<session>/ altına yazar
 ```
 
 ## Kurulum
@@ -126,37 +139,46 @@ log dosyasını sunucuya HTTP upload eder.
 
 | Method | URL                 | Kullanım                                              |
 |--------|---------------------|-------------------------------------------------------|
+| POST   | `/login`            | Kullanıcı girişi (cpeteam varsayılan + grk_users)     |
 | POST   | `/register`         | Agent kaydı / heartbeat                               |
 | POST   | `/progress`         | Agent → sunucu ilerleme bildirimi                     |
+| POST   | `/result`           | Agent → sunucu test sonuç özeti (DB'ye yazılır)       |
 | POST   | `/logs/upload`      | Agent → sunucu log dosyası yükleme (multipart)        |
 | GET    | `/state`            | Birleşik durum (dashboard 1 sn polling)               |
 | POST   | `/session/start`    | Testi başlat (override + brand/model/firmware gövde)  |
 | POST   | `/session/stop`     | Testi durdur                                          |
+| POST   | `/session/reset`    | Her şeyi başa al (testler + ilerleme + health-check)  |
 | GET    | `/health-check`     | Tüm düğümlerin anlık erişilebilirliği (kırmızı/yeşil) |
 | GET    | `/firmware/brands`  | DB'den marka listesi (yoksa 503 → serbest metin)      |
 | GET    | `/firmware/models/{brand}`          | DB'den model listesi                  |
 | GET    | `/firmware/versions/{brand}/{model}`| DB'den firmware sürümleri             |
 | GET    | `/health`           | Sağlık kontrolü                                       |
 
-## Şu anki durum (Faz 1–3)
+## Şu anki durum
 
 | Parça | Durum |
 |------|------|
 | Sunucu↔agent kayıt/komut/progress/log upload | ✅ gerçek |
 | 4 düğümlü canlı dashboard (Vue 3 + Vuetify) | ✅ gerçek |
+| Login (cpeteam varsayılan + GRK `grk_users`) + karşılama ekranı | ✅ gerçek |
 | ping (internet/modem), youtube | ✅ gerçek |
-| iperf3 (Linux server + Mac client) | ✅ gerçek |
-| torrent, wifi_track | 🟡 simülasyon (Faz 4: gerçek) |
+| iperf3 (kablolu Mac server + Wi-Fi Mac client) | 🟡 gerçek — sahada doğrulanıyor |
+| torrent (qBittorrent), wifi_track (gerçek WLAN, RX/TX) | ✅ gerçek |
 | Marka/Model/Firmware combobox (cpeqadb, GRK ile aynı; yoksa serbest metin) | ✅ gerçek |
 | Aşamalı Health-Check paneli (kırmızı/yeşil ışıklar) | ✅ gerçek |
 | Statik IP + boot listener paketleme (`provisioning/`) | ✅ gerçek (launchd/Task Scheduler/systemd) |
-| Log → FTPS + PostgreSQL + bildirim | ⏳ Faz 5 |
+| Log → FTP yükleme (klasör yapısı) | ✅ gerçek |
+| Sonuç → PostgreSQL (`copy_` staging tabloları) | ✅ gerçek — sahada doğrulanıyor |
+| Tamamlanınca mail + Telegram bildirimi | ✅ gerçek |
+| error_log → FTP (bildirim yok) | ✅ gerçek |
 
 ## Yol haritası
 
-- **Faz 4:** torrent (qBittorrent Web API), wifi_track (platforma özgü WLAN okuma + Excel); 2 Mac iperf için çoklu port.
-- **Faz 5:** oturum bitince `logs/<session>/` → FTPS + PostgreSQL (SSL) + mail/Telegram. Sertifika ve kimlik bilgileri ortam değişkeniyle taşınır (kod içinde değil).
-- **Faz 6 (kısmen tamam):** statik IP + boot autostart paketlemesi `provisioning/` altında geldi (launchd/Task Scheduler/systemd). Kalan: tek-tıklık installer.
+- **DB birleştirme:** `copy_` staging tabloları doğrulanınca asıl tablolara taşınacak
+  (Senaryo 3: `grk_*` rename + `test_name`/`node_name` + `iperf_test`). Detay:
+  [`../GELISTIRME_GUNLUGU.md`](../GELISTIRME_GUNLUGU.md).
+- **Saha doğrulaması:** iperf otomatik başlatma + FTP/DB yazımı 4 fiziksel makinede test.
+- **Installer:** tek-tıklık kurulum paketi (statik IP + boot autostart zaten `provisioning/`).
 
 > **Firmware DB:** Marka/Model/Firmware combobox'ları GRK ile aynı `cpeqadb`'den
 > okunur (`grk_firmware`, SSL). Sertifikalar `fullservice-backend/certs/` altında
@@ -164,5 +186,8 @@ log dosyasını sunucuya HTTP upload eder.
 
 ## Güvenlik notu
 Bu repoda **hiçbir** üretim kimlik bilgisi (DB şifresi, FTP parolası, sertifika,
-mail/Telegram token) yer almaz. Faz 5'e geçildiğinde tüm sırlar `.env` /
-ortam değişkenleri üzerinden taşınacak; bu repoda asla commit'lenmez.
+mail/Telegram token) yer almaz. Sırlar önce **ortam değişkeni**, yoksa gitignore'lu
+`secrets.json` dosyasından okunur (`common.config.get_secret`). Gereken anahtarlar:
+`FS_TELEGRAM_BOT_TOKEN`, `FS_TELEGRAM_CHAT_ID`, `FS_SMTP_USER`, `FS_SMTP_PASS`,
+`FS_SMTP_FROM`. Sertifikalar `certs/` altında. Bu dosyalar repoya **asla** girmez,
+sunucuya elle konur.

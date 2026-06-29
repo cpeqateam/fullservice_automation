@@ -14,6 +14,9 @@ içindir. Hiç sanal makine kurmamış biri için ekran ekran yazılmıştır.
 > **kablolu Mac `iperf3 -s` (server) + Wi-Fi Mac client** olarak çalışır. torrent
 > (qBittorrent) ve wifi_track artık **gerçek**tir (simülasyon değil); ping/wifi_track
 > görünür terminal açar; YouTube en yüksek kaliteyi dener (Chrome+selenium).
+> Dashboard'a **giriş ekranı** geldi: DB olmasa bile `cpeteam / cpeteam` her zaman çalışır.
+> FTP/DB yazımı ve Telegram/mail bildirimi için sırasıyla `certs/` ve `secrets.json`
+> gerekir; **lab'da ikisi de yoksa testler yine çalışır**, sadece o adımlar atlanır.
 
 ---
 
@@ -62,9 +65,10 @@ FS_AGENT_PORT=7532 python run_agent.py mac_wifi http://127.0.0.1:8770   # Termin
 FS_AGENT_PORT=7533 python run_agent.py win_wifi http://127.0.0.1:8770   # Terminal 4
 ```
 
-Tarayıcı: **http://127.0.0.1:8770**. Sağ paneldeki **Health-Check**'e bas → 4 düğüm
-yeşil yanmalı. Sol formdan Marka/Model/Firmware (DB yoksa serbest metin) + Süre seç
-→ **FULL Servis Başlat**. Test ilerlemeleri canlı akıyorsa sistem sağlam.
+Tarayıcı: **http://127.0.0.1:8770** → giriş yap (`cpeteam` / `cpeteam`) → karşılama
+ekranında **Test Ekranına Gir**. Sağ paneldeki **Health-Check**'e bas → 4 düğüm yeşil
+yanmalı. Sol formdan Marka/Model/Firmware (DB yoksa serbest metin) + Süre seç →
+**FULL Servis Başlat**. Test ilerlemeleri canlı akıyorsa sistem sağlam.
 
 ---
 
@@ -244,7 +248,8 @@ python run_agent.py win_wifi http://LINUX_IP:8770
 # BÖLÜM 4 — Testi başlat
 
 Linux'un Firefox'unda → **http://localhost:8770** (veya herhangi bir cihazdan
-`http://LINUX_IP:8770`) → **FULL Servis Başlat**.
+`http://LINUX_IP:8770`) → giriş yap (`cpeteam` / `cpeteam`) → **Test Ekranına Gir** →
+**FULL Servis Başlat**.
 
 Panelde 4 düğüm yeşil yanıp testler eşzamanlı koşmalı. ✅
 

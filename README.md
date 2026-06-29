@@ -24,9 +24,12 @@ fullservice_automation/
 │   ├── src/  package.json  vite.config.js
 │   └── README.md                        # frontend dokümantasyonu (dev/build, bileşenler)
 │
-├── MIMARI.md                            # Mimari kararlar + akış (sunucu↔agent, runner'lar)
 ├── KOD_HAKIMIYETI.md                    # Java'dan gelen biri için kod gezisi (dosya dosya)
-├── MIMARI.drawio                        # Aynı mimarinin draw.io çizimi
+├── GELISTIRME_GUNLUGU.md                # mevcut durum + sıradaki adımlar (geliştirme günlüğü)
+├── IPERF_REHBERI.md                     # iperf kurulum + sorun giderme rehberi
+├── DB_YENI_SEMA.drawio                  # hedef birleşik DB şeması (Senaryo 3)
+├── UML_CLASS_DIAGRAM.drawio             # backend sınıf/modül diyagramı
+├── UML_USECASE_DIAGRAM.drawio           # use-case diyagramı
 └── README.md                            # (bu dosya)
 
 Kurulum rehberleri (fullservice-backend/ altında):
@@ -112,6 +115,10 @@ Kurulum rehberleri (**statik IP**, **boot listener**, ön koşullar):
 
 GRK'nın **Günlük Rutin Kontrol** sekmesi örnek alınarak:
 
+- **Giriş ekranı:** GRK ile aynı `grk_users` tablosundan doğrulanır; DB'ye erişim
+  yoksa bile `cpeteam / cpeteam` varsayılan hesabı **her zaman** geçerlidir. Giriş
+  sonrası karşılama ekranı (logo + "Hoş Geldiniz \<kullanıcı\>" + "Test Ekranına Gir").
+  Sol üstteki logoya tıklayınca karşılama ekranına döner.
 - **Cihaz ve Test Bilgileri** kartı: **Marka / Model / Firmware** combobox'ları
   (DB'den — `cpeqadb`/`grk_firmware`; bağlantı yoksa serbest-metin girişine düşer),
   **Süre (sn)** girişi, **FULL Servis Başlat** butonu. Başlat → online listener'lara
@@ -152,8 +159,10 @@ GRK'nın **Günlük Rutin Kontrol** sekmesi örnek alınarak:
 | —   | Statik IP + boot listener paketleme (`provisioning/`)                   | ✅    |
 | —   | Mavi tema, sol menü, 2×2 kart, Sıfırla butonu, oturum/ilerleme özeti    | ✅    |
 | 4   | torrent (qBittorrent) + wifi_track **gerçek**; ping/wifi **canlı terminal**; YouTube en yüksek kalite | ✅ |
-| —   | iperf topoloji (kablolu Mac server / Wi-Fi Mac client) — bağlantı düzeltmesi sürüyor | 🟡 |
-| 5   | Loglar **bilgisayar klasörlerine** (LINUX/MAC_ETH/MAC_WIFI/WIN_WIFI) ✅; **FTPS + PostgreSQL + mail/Telegram** | ⏳ |
+| —   | Login ekranı (GRK `grk_users`; `cpeteam/cpeteam` her zaman geçerli) + karşılama ekranı | ✅ |
+| 5   | Loglar **bilgisayar klasörlerine** (LINUX/MAC_ETH/MAC_WIFI/WIN_WIFI) ✅; **FTPS** yükleme ✅; **PostgreSQL** yazma (`copy_` staging) ✅; **mail/Telegram** bildirim ✅; **error_log** → FTP ✅ | ✅ |
+| —   | iperf topoloji (kablolu Mac server / Wi-Fi Mac client) — sahada doğrulama sürüyor | 🟡 |
+| —   | DB: `copy_` staging → asıl tablolara **birleştirme** (Senaryo 3)        | ⏳    |
 | 6   | Tek-tıklık installer paketleme                                          | ⏳    |
 
 ---
@@ -165,13 +174,17 @@ Bu repo **hiçbir** üretim kimliği içermez:
 - SSL sertifikaları (`ca.crt`, `client.crt`, `client.key`) ❌
 - Mail / Telegram token'ları ❌
 
-Firmware DB ve Faz 5'te gelecek tüm sırlar `.env` / ortam değişkenleriyle taşınır;
-`.gitignore` ile commit dışında tutulur. Sertifikalar `fullservice-backend/certs/`
-altında aranır (repoda yok). Repo içine **asla** sır yazılmaz.
+**Sırlar nereden okunur:** Tüm sırlar önce **ortam değişkeni**, yoksa gitignore'lu
+`fullservice-backend/secrets.json` dosyasından okunur (`common.config.get_secret`).
+Bildirim için gerekli anahtarlar: `FS_TELEGRAM_BOT_TOKEN`, `FS_TELEGRAM_CHAT_ID`,
+`FS_SMTP_USER`, `FS_SMTP_PASS`, `FS_SMTP_FROM`. SSL sertifikaları
+`fullservice-backend/certs/` altında aranır. Bu dosyaların hiçbiri repoda yoktur;
+sunucuya elle konur. Repo içine **asla** sır yazılmaz.
 
 ---
 
 ## Lisans / İletişim
 
-İç kullanım (Türk Telekom CPE QA). Geliştirici notları ve karar gerekçeleri
-[`MIMARI.md`](MIMARI.md) içinde.
+İç kullanım (Türk Telekom CPE QA). Geliştirici notları, mevcut durum ve karar
+gerekçeleri [`GELISTIRME_GUNLUGU.md`](GELISTIRME_GUNLUGU.md) içinde; kod gezisi için
+[`KOD_HAKIMIYETI.md`](KOD_HAKIMIYETI.md).

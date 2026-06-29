@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" agent="Claude" version="24.0.0">
   <diagram name="Sinif Diyagrami" id="class-diagram">
-    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1800" math="0" shadow="0">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="2000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -22,16 +22,16 @@
         </mxCell>
 
         <!-- ============ SERVER PAKETI (yesil) ============ -->
-        <mxCell id="server_main" value="&#171;FastAPI app&#187; server/main.py&#10;────────────────────────────&#10;CONFIG, orch: Orchestrator, app&#10;class SessionStartRequest(BaseModel):&#10;  modem_ip, internet_ip, youtube_link,&#10;  duration, brand, model, firmware&#10;────────────────────────────&#10;GET  /health&#10;POST /api/register(req)&#10;POST /api/progress(upd)&#10;POST /api/logs/upload(node_id, session_id, file)&#10;GET  /api/state&#10;POST /api/session/start(req)&#10;POST /api/session/stop&#10;POST /api/session/reset&#10;GET  /api/health-check&#10;GET  /api/firmware/brands&#10;GET  /api/firmware/models/{brand}&#10;GET  /api/firmware/versions/{brand}/{model}&#10;mount StaticFiles → dashboard (dist/)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="40" y="320" width="340" height="360" as="geometry" />
+        <mxCell id="server_main" value="&#171;FastAPI app&#187; server/main.py&#10;────────────────────────────&#10;CONFIG, orch: Orchestrator, app&#10;_Tee  # stdout/stderr → logs/app.log&#10;class LoginRequest(BaseModel): username, password&#10;class SessionStartRequest(BaseModel):&#10;  modem_ip, internet_ip, youtube_link, duration,&#10;  brand, model, firmware, user_name, user_surname,&#10;  iperf_port, iperf_parallel, iperf_reverse&#10;────────────────────────────&#10;GET  /health&#10;POST /api/login(req)&#10;POST /api/register(req)&#10;POST /api/progress(upd)&#10;POST /api/result(report)&#10;POST /api/logs/upload(node_id, session_id, file)&#10;GET  /api/state&#10;POST /api/session/start(req)&#10;POST /api/session/stop&#10;POST /api/session/reset&#10;GET  /api/health-check&#10;GET  /api/firmware/brands&#10;GET  /api/firmware/models/{brand}&#10;GET  /api/firmware/versions/{brand}/{model}&#10;mount StaticFiles → dashboard (dist/)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="340" height="430" as="geometry" />
         </mxCell>
 
-        <mxCell id="orchestrator" value="&#171;class&#187; Orchestrator  (server/orchestrator.py)&#10;────────────────────────────&#10;config, defaults, server_lan_ip&#10;_lock: RLock&#10;nodes: dict[str, dict]&#10;session: dict (session_id, running, device...)&#10;_server_stop: Event&#10;_server_threads: list[Thread]&#10;────────────────────────────&#10;__init__(config)&#10;_blank_test() : dict&#10;register(req)&#10;update_progress(node_id, task, prog, status, msg)&#10;get_state() : dict&#10;_node_view(node) : dict&#10;_iperf_server_ip() : str&#10;start_session(overrides) : dict&#10;_send_start(nv, session_id, roles, params) : bool&#10;_run_server_local(session_id, roles, params)&#10;stop_session() : dict&#10;reset_session() : dict&#10;health_check() : dict" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="40" y="720" width="340" height="380" as="geometry" />
+        <mxCell id="orchestrator" value="&#171;class&#187; Orchestrator  (server/orchestrator.py)&#10;────────────────────────────&#10;config, defaults, server_lan_ip&#10;_lock: RLock&#10;nodes: dict[str, dict]&#10;session: dict (session_id, running, device, log_offset...)&#10;_server_stop: Event&#10;_server_threads: list[Thread]&#10;────────────────────────────&#10;__init__(config)&#10;_blank_test() : dict&#10;register(req)&#10;update_progress(node_id, task, prog, status, msg)&#10;  → _all_tests_terminal() → _on_session_complete()&#10;record_result(report)  → db_service.save_* + FTP&#10;upload_log_to_ftp(node_id, session_id, path)&#10;get_state() : dict   ·  _node_view(node) : dict&#10;_iperf_server_ip() / _iperf_server_node_name() : str&#10;start_session(overrides) : dict&#10;_send_start(nv, session_id, roles, params) : bool&#10;_run_server_local(session_id, roles, params)&#10;_on_session_complete(info)  # bildirim + error_log&#10;stop_session() : dict   ·  reset_session() : dict&#10;health_check() : dict" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="40" y="790" width="340" height="420" as="geometry" />
         </mxCell>
 
         <mxCell id="log_collector" value="&#171;modul&#187; server/log_collector.py&#10;────────────────────────────&#10;_CONFIG&#10;────────────────────────────&#10;node_session_dir(node_id, session_id) : str&#10;save_upload(node_id, session_id, filename, fileobj) : str&#10;list_session_files(session_id) : list[str]" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="40" y="1140" width="340" height="140" as="geometry" />
+          <mxGeometry x="40" y="1250" width="340" height="140" as="geometry" />
         </mxCell>
 
         <!-- ============ AGENT PAKETI (turuncu) ============ -->
@@ -44,12 +44,12 @@
         </mxCell>
 
         <!-- ============ COMMON PAKETI (sari) ============ -->
-        <mxCell id="protocol" value="&#171;modul&#187; common/protocol.py  (sunucu↔agent sozlesmesi)&#10;────────────────────────────&#10;enum TestType: PING_INTERNET, PING_MODEM, YOUTUBE,&#10;  IPERF_SERVER, IPERF, TORRENT, WIFI_TRACK&#10;enum TestStatus: IDLE, RUNNING, COMPLETED, ERROR, STOPPED&#10;TEST_LABELS : dict&#10;────────────────────────────&#10;class RegisterRequest(BaseModel):&#10;  node_id, hostname, platform, ip, agent_port&#10;class TestParams(BaseModel):&#10;  modem_ip, internet_ip, youtube_link, iperf_server,&#10;  iperf_port, iperf_parallel, torrent_magnet,&#10;  torrent_recycle_gb, duration, extra&#10;class StartCommand(BaseModel):&#10;  session_id, tests, params&#10;class ProgressUpdate(BaseModel):&#10;  node_id, session_id, task, progress, status, message, details" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="780" y="320" width="380" height="310" as="geometry" />
+        <mxCell id="protocol" value="&#171;modul&#187; common/protocol.py  (sunucu↔agent sozlesmesi)&#10;────────────────────────────&#10;enum TestType: PING_INTERNET, PING_MODEM, YOUTUBE,&#10;  IPERF_SERVER, IPERF, TORRENT, WIFI_TRACK&#10;enum TestStatus: IDLE, RUNNING, COMPLETED, ERROR, STOPPED&#10;TEST_LABELS : dict&#10;────────────────────────────&#10;class RegisterRequest(BaseModel):&#10;  node_id, hostname, platform, ip, agent_port&#10;class TestParams(BaseModel):&#10;  modem_ip, internet_ip, youtube_link, iperf_server,&#10;  iperf_port, iperf_parallel, iperf_reverse,&#10;  torrent_magnet, torrent_recycle_gb, duration,&#10;  brand, model, firmware, extra&#10;class StartCommand(BaseModel):&#10;  session_id, tests, params&#10;class ProgressUpdate(BaseModel):&#10;  node_id, session_id, task, progress, status, message, details&#10;class ResultReport(BaseModel):&#10;  node_id, session_id, task, kind, stats, ftp_file_path" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="320" width="380" height="350" as="geometry" />
         </mxCell>
 
-        <mxCell id="config" value="&#171;modul&#187; common/config.py&#10;────────────────────────────&#10;CONFIG_PATH, LOGS_DIR, DASHBOARD_DIR,&#10;CERT_DIR, _FALLBACK&#10;────────────────────────────&#10;load_config() : dict&#10;get_node(config, node_id) : dict|None&#10;node_log_folder(node_id, config) : str&#10;detect_lan_ip() : str" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="780" y="670" width="380" height="170" as="geometry" />
+        <mxCell id="config" value="&#171;modul&#187; common/config.py&#10;────────────────────────────&#10;CONFIG_PATH, LOGS_DIR, DASHBOARD_DIR,&#10;CERT_DIR, _SECRETS_PATH, _FALLBACK&#10;────────────────────────────&#10;load_config() : dict&#10;get_node(config, node_id) : dict|None&#10;node_log_folder(node_id, config) : str&#10;detect_lan_ip() : str&#10;get_secret(key, default) : str  # env → secrets.json" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="670" width="380" height="190" as="geometry" />
         </mxCell>
 
         <mxCell id="firmware_db" value="&#171;modul&#187; common/firmware_db.py  (PostgreSQL/SSL)&#10;────────────────────────────&#10;DB_URL, engine, SessionLocal, ssl_args&#10;────────────────────────────&#10;_libpq_safe_path(path) : str&#10;db_available() : bool&#10;_query(sql, params) : list&#10;get_brands() : list[str]&#10;get_models(brand) : list[str]&#10;get_versions(brand, model) : list[str]" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
@@ -57,12 +57,12 @@
         </mxCell>
 
         <!-- ============ RUNNERS: base + registry (kirmizi) ============ -->
-        <mxCell id="base" value="&#171;modul&#187; common/runners/base.py  (runner sozlesmesi)&#10;────────────────────────────&#10;NO_WINDOW, CREATE_NEW_CONSOLE&#10;ProgressCb = Callable[[float,str,str], None]&#10;@dataclass RunContext:&#10;  node_id, session_id, log_dir,&#10;  progress: ProgressCb, stop: Event&#10;  + stamp() : str&#10;  + log_path(name) : str&#10;────────────────────────────&#10;is_windows() / is_mac() / is_linux()&#10;open_terminal_running(argv, title)&#10;open_log_viewer(log_file, title)&#10;close_terminal(proc)&#10;_osascript_terminal / _linux_terminal&#10;_write_launch_script / _which" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1220" y="320" width="360" height="300" as="geometry" />
+        <mxCell id="base" value="&#171;modul&#187; common/runners/base.py  (runner sozlesmesi)&#10;────────────────────────────&#10;NO_WINDOW, CREATE_NEW_CONSOLE, PROJECT_TAG=&quot;FULL_Service&quot;&#10;ProgressCb = Callable[[float,str,str], None]&#10;ResultCb   = Callable[[str, dict], None]&#10;@dataclass RunContext:&#10;  node_id, session_id, log_dir,&#10;  progress: ProgressCb, stop: Event, result: ResultCb&#10;  + stamp() : str&#10;  + log_path(name) : str&#10;  + grk_log_path(kind, brand, model, fw, *extras) : str&#10;────────────────────────────&#10;grk_style_filename(kind, brand, model, fw, *extras, ext)&#10;is_windows() / is_mac() / is_linux()&#10;open_terminal_running(argv, title)&#10;open_log_viewer(log_file, title)&#10;close_terminal(proc)&#10;_osascript_terminal / _linux_terminal&#10;_write_launch_script / _which" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="320" width="360" height="340" as="geometry" />
         </mxCell>
 
         <mxCell id="registry" value="&#171;modul&#187; common/runners/registry.py  (TestType → runner)&#10;────────────────────────────&#10;RunnerFn = Callable[[TestParams, RunContext], list[str]]&#10;RUNNERS : dict[str, RunnerFn]&#10;────────────────────────────&#10;get_runner(test_type) : RunnerFn|None" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1220" y="660" width="360" height="130" as="geometry" />
+          <mxGeometry x="1220" y="685" width="360" height="130" as="geometry" />
         </mxCell>
 
         <!-- ============ RUNNERS: testler (kirmizi) ============ -->
@@ -107,6 +107,39 @@
           <mxGeometry x="1640" y="1520" width="360" height="80" as="geometry" />
         </mxCell>
 
+        <!-- ============ SERVER SERVISLERI (yesil, sonradan eklenenler) ============ -->
+        <mxCell id="auth_service" value="&#171;modul&#187; server/auth_service.py  (login)&#10;────────────────────────────&#10;DEFAULT_USER=cpeteam, DEFAULT_PASS=cpeteam&#10;────────────────────────────&#10;_check_password(plain, stored) : bool&#10;login(username, password) : dict|None&#10;  # once varsayilan, sonra grk_users" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="900" width="320" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="db_service" value="&#171;modul&#187; server/db_service.py  (copy_ staging tablolari)&#10;────────────────────────────&#10;T_FIRMWARE, T_SESSION, T_PING, T_SPEED,&#10;T_WIFI, T_IPERF  # birlestirmede tek degisim noktasi&#10;────────────────────────────&#10;db_available() : bool&#10;_get_firmware_id(db, brand, model, fw)&#10;create_session(...) : int&#10;update_session_end(session_id, end, dur, ...)&#10;save_ping(session_id, node_name, stats, ftp)&#10;save_iperf(session_id, node, server_node, stats, ftp)&#10;save_wifi(session_id, node_name, stats, ftp)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1060" width="320" height="230" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ftp_service" value="&#171;modul&#187; server/ftp_service.py  (FTP yukleme)&#10;────────────────────────────&#10;test_type_from_filename(name) : str&#10;test_type_from_kind(kind) : str&#10;build_target_dir(brand, model, fw, type, node) : str&#10;  # &lt;MARKA&gt;/&lt;MODEL&gt;/&lt;FW&gt;/FULLSERVIS/&lt;Tip&gt;/&lt;PC&gt;/&#10;upload_files_to_ftp(paths, target_dir)&#10;upload_async(paths, target_dir)  # daemon thread&#10;_connect_ftps_secure / _connect_ftp_plain&#10;_ensure_dir_recursive(ftp, path)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1310" width="320" height="210" as="geometry" />
+        </mxCell>
+
+        <mxCell id="log_capture" value="&#171;modul&#187; server/log_capture.py  (error_log → FTP)&#10;────────────────────────────&#10;current_size() : int&#10;finalize_async(device, session_id, start, offset)&#10;_slice_to(dest, offset) : bool&#10;_worker(...)  # app.log dilimi → FTP/Errorlog (bildirim YOK)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1540" width="320" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="notification_service" value="&#171;modul&#187; server/notification_service.py  (test bitince)&#10;────────────────────────────&#10;TO_ADDRESSES, CC_ADDRESSES, GRACE_SECONDS=10&#10;────────────────────────────&#10;send_completion(device, session_id, start_time)&#10;_worker(...)  # 10sn bekle, loglari topla&#10;_build_body(device, start, end) : str&#10;_send_email(body)  # sadece mesaj&#10;_send_telegram(body, logs)  # mesaj + ozet loglar" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="900" width="380" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="notify" value="&#171;modul&#187; server/notify.py  (Telegram — GRK birebir)&#10;────────────────────────────&#10;BOT_TOKEN, CHAT_ID  ← get_secret()&#10;────────────────────────────&#10;send_telegram(text)&#10;send_document(path, caption)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1110" width="380" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="email_sender" value="&#171;class&#187; EmailSender  (server/email_sender.py)&#10;────────────────────────────&#10;smtp_server, smtp_port&#10;username, password, from_addr  ← get_secret()&#10;────────────────────────────&#10;set_body / set_subject / add_to_address&#10;add_cc_address / add_attachment&#10;send_email() : bool" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1270" width="380" height="170" as="geometry" />
+        </mxCell>
+
+        <mxCell id="excel_service" value="&#171;modul&#187; server/excel_service.py&#10;────────────────────────────&#10;Ping/Wifi icin Excel ciktisi uretir&#10;(baska oturumda eklendi — dokunma)" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacingLeft=8;spacingTop=6;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1460" width="380" height="110" as="geometry" />
+        </mxCell>
+
         <!-- ============ BAGIMLILIK OKLARI ============ -->
         <mxCell id="e1" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="run_server" target="server_main"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e2" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="run_agent" target="agent_main"><mxGeometry relative="1" as="geometry" /></mxCell>
@@ -135,6 +168,22 @@
         <mxCell id="e25" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="firmware_db" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e26" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="log_collector" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
         <mxCell id="e27" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="registry" target="protocol"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- yeni server servisleri icin bagimlilik oklari -->
+        <mxCell id="e28" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="server_main" target="auth_service"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e29" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="db_service"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e30" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="ftp_service"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e31" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="notification_service"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e32" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="log_capture"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e33" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="notification_service" target="notify"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e34" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="notification_service" target="email_sender"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e35" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="notification_service" target="log_collector"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e36" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="log_capture" target="ftp_service"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e37" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="auth_service" target="firmware_db"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e38" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="db_service" target="firmware_db"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e39" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="notify" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e40" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="email_sender" target="config"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e41" style="endArrow=open;dashed=1;html=1;strokeColor=#666666;" edge="1" parent="1" source="orchestrator" target="excel_service"><mxGeometry relative="1" as="geometry" /></mxCell>
 
       </root>
     </mxGraphModel>

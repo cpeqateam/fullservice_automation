@@ -46,6 +46,22 @@ cd ../fullservice-frontend && npm install && npm run build && cd ../fullservice-
 chmod 600 certs/client.key
 ```
 
+> **Sırlar (Telegram + mail bildirimi için) — sadece sunucuda gerekli:**
+> `fullservice-backend/secrets.json` dosyasını **elle** oluştur (repoda YOK, gitignore'lu).
+> İçeriği:
+> ```json
+> {
+>   "FS_TELEGRAM_BOT_TOKEN": "...",
+>   "FS_TELEGRAM_CHAT_ID": -4802883729,
+>   "FS_SMTP_USER": "cpetestteam",
+>   "FS_SMTP_PASS": "...",
+>   "FS_SMTP_FROM": "cpetestteam@gmail.com"
+> }
+> ```
+> Bu dosya yoksa testler yine çalışır, sadece bildirim gitmez. Aynı değerleri ortam
+> değişkeni olarak da verebilirsin (`FS_TELEGRAM_BOT_TOKEN=...` vb.).
+> FTP/DB yazımı ise `certs/` ile çalışır (yukarıda kopyalandı); `certs` yoksa sessizce atlanır.
+
 ### Statik IP
 ```bash
 # config.json'u doğrula (eth0 yazılı olmalı)
@@ -178,8 +194,12 @@ python run_agent.py
 
 1. Linux'ta `run_server.py` çalışıyor olmalı
 2. 3 makinede `run_agent.py` çalışıyor olmalı
-3. **http://192.168.1.10:8770** → Health Check → 4 düğüm yeşil
-4. Marka/Model/Firmware seç → FULL Servis Başlat
+3. **http://192.168.1.10:8770** → giriş yap (`cpeteam` / `cpeteam`, ya da `grk_users`'taki
+   bir hesap) → karşılama ekranında **Test Ekranına Gir**
+4. Health Check → 4 düğüm yeşil
+5. Marka/Model/Firmware seç → FULL Servis Başlat
+6. Test bitince: loglar FTP'ye, sonuçlar `copy_` tablolarına yazılır; Telegram + mail
+   bildirimi gider (secrets.json varsa)
 
 ---
 
@@ -241,3 +261,6 @@ Unregister-ScheduledTask -TaskName FullServiceAgent_win_wifi -Confirm:$false -Er
 | Marka/Model boş | `certs/` eksik veya `chmod 600 certs/client.key` yapılmamış |
 | Mac terminal açılmıyor | Normal — boot servisi varsa masaüstü yok. Elle başlatınca açılır |
 | Windows PS script hatası | `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| Giriş yapılamıyor | DB kapalıysa bile `cpeteam`/`cpeteam` her zaman çalışır; rota 405 verirse `run_server.py`'yi yeniden başlat |
+| Telegram/mail gelmiyor | Sunucuda `secrets.json` var mı? `FS_NOTIFY_DISABLE=1` ayarlı olmasın |
+| FTP'ye yüklenmiyor | `certs/` var mı? `FS_FTP_DISABLE=1` ayarlı olmasın |

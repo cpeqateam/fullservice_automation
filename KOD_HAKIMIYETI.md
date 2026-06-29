@@ -1,11 +1,9 @@
 # FULL Servis — Kod Hakimiyeti Rehberi (Java'dan gelenler için)
 
-Bu doküman, projedeki **Python** kodunu Java geçmişi olan biri için açar. Amaç:
-Python'un kısa/yoğun yazımı bazen "sihir" gibi görünür; burada o sihri Java
-karşılıklarıyla çözüyoruz ki kodu rahat okuyup değiştirebilesin.
+Bu doküman, projedeki **Python** kodunu açar.
 
-> Mimari/akış için: [`MIMARI.md`](MIMARI.md). Bu dosya **kodu okuma** rehberidir.
-> Kurulum için: `fullservice-backend/KURULUM_SAHA_4_MAKINE.md`.
+> Mevcut durum + sıradaki adımlar için: [`GELISTIRME_GUNLUGU.md`](GELISTIRME_GUNLUGU.md).
+> Bu dosya **kodu okuma** rehberidir. Kurulum için: `fullservice-backend/KURULUM_SAHA_4_MAKINE.md`.
 
 ---
 
@@ -24,28 +22,28 @@ karşılıklarıyla çözüyoruz ki kodu rahat okuyup değiştirebilesin.
 
 ## 1. Python ↔ Java sözlüğü (en çok karıştıranlar)
 
-| Python | Java karşılığı / açıklaması |
-|--------|------------------------------|
-| `def f(a, b): ...` | `... f(a, b) { ... }` — dönüş tipi zorunlu değil. |
-| `self` | `this` — ama **açıkça** ilk parametre olarak yazılır: `def m(self, x)`. |
-| `__init__(self, ...)` | Constructor. |
-| Girinti (indent) | `{ }` yerine **boşluk girintisi** blok belirler. Süslü parantez YOK. |
-| `x: int = 5` | Tip ipucu (`int x = 5`). **Çalışma zamanında zorlanmaz**, sadece okunabilirlik/IDE. |
-| `None` | `null`. |
-| `True / False` | `true / false`. |
-| `dict` `{ "a": 1 }` | `Map<String,Object>` (HashMap). |
-| `list` `[1, 2]` | `List` (ArrayList). |
-| `tuple` `(1, 2)` | Değişmez (immutable) liste; sabit demet. |
-| `f"merhaba {ad}"` | String template: `"merhaba " + ad`. (f-string) |
-| `# yorum` | `// yorum`. `"""..."""` = çok satırlı yorum/doküman (Javadoc gibi). |
-| `import x` / `from p import f` | `import` (paket = klasör; her klasörde `__init__.py`). |
-| `raise X(...)` / `try/except` | `throw` / `try/catch` (`except` = `catch`). |
-| `with open(...) as f:` | try-with-resources: blok bitince dosya otomatik kapanır. |
-| `lambda p, s, m: ...` | Lambda: `(p, s, m) -> ...`. |
-| `@dataclass`, `@app.get(...)` | **Anotasyon gibi görünür ama "decorator"dır** (aşağıda). |
-| `[t for t in xs if cond]` | Stream: `xs.stream().filter(cond).collect(...)`. (list comprehension) |
-| `a or b` | `a != null/0/""/[] ? a : b` — "ilk doğru/dolu olan". |
-| `*args, **kwargs` | Değişken sayıda argüman (varargs) + isimli argüman sözlüğü. |
+| Python                         |                            Java karşılığı / açıklaması                              |
+|--------------------------------|-------------------------------------------------------------------------------------|
+| `def f(a, b): ...`             | `... f(a, b) { ... }` — dönüş tipi zorunlu değil.                                   |
+| `self`                         | `this` — ama **açıkça** ilk parametre olarak yazılır: `def m(self, x)`.             |
+| `__init__(self, ...)`          | Constructor.                                                                        |
+| Girinti (indent)               | `{ }` yerine **boşluk girintisi** blok belirler. Süslü parantez YOK.                |
+| `x: int = 5`                   | Tip ipucu (`int x = 5`). **Çalışma zamanında zorlanmaz**, sadece okunabilirlik/IDE. |
+| `None`                         | `null`.                                                                             |
+| `True / False`                 | `true / false`.                                                                     |
+| `dict` `{ "a": 1 }`            | `Map<String,Object>` (HashMap).                                                     |
+| `list` `[1, 2]`                | `List` (ArrayList).                                                                 |
+| `tuple` `(1, 2)`               | Değişmez (immutable) liste; sabit demet.                                            |
+| `f"merhaba {ad}"`              | String template: `"merhaba " + ad`. (f-string)                                      |
+| `# yorum`                      | `// yorum`. `"""..."""` = çok satırlı yorum/doküman (Javadoc gibi).                 |
+| `import x` / `from p import f` | `import` (paket = klasör; her klasörde `__init__.py`).                              |
+| `raise X(...)` / `try/except`  | `throw` / `try/catch` (`except` = `catch`).                                         |
+| `with open(...) as f:`         | try-with-resources: blok bitince dosya otomatik kapanır.                            |
+| `lambda p, s, m: ...`          | Lambda: `(p, s, m) -> ...`.                                                         |
+| `@dataclass`, `@app.get(...)`  | **Anotasyon gibi görünür ama "decorator"dır** (aşağıda).                            |
+| `[t for t in xs if cond]`      | Stream: `xs.stream().filter(cond).collect(...)`. (list comprehension)               |
+| `a or b`                       | `a != null/0/""/[] ? a : b` — "ilk doğru/dolu olan".                                |
+| `*args, **kwargs`              | Değişken sayıda argüman (varargs) + isimli argüman sözlüğü.                         |
 
 ---
 
@@ -102,7 +100,8 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
 ## 3. Dosya dosya gezinti (okuma sırası)
 
 > İpucu: Kodu "çalışma sırasına" göre oku. Aşağıda bir testin baştan sona izlediği
-> yol var. Java'daki "main → controller → service → util" zincirini düşün.
+> yol var. Java'daki "main → controller → service → util" zincirini düşün. 
+
 
 ### 3.1 Giriş noktaları (main)
 - [`fullservice-backend/run_server.py`](fullservice-backend/run_server.py) — Linux'ta
@@ -114,14 +113,38 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
 
 ### 3.2 Sunucu tarafı (`server/`)
 - [`server/main.py`](fullservice-backend/server/main.py) — **Controller katmanı.**
-  Tüm `@app.get/@app.post` endpoint'leri burada (`/api/state`, `/api/session/start`,
-  `/api/session/reset`, `/api/health-check`, `/api/firmware/...`, `/api/logs/upload`).
-  Her endpoint ince; işi `orch`'a (orchestrator) devreder. En sonda `app.mount("/")`
-  ile Vue arayüzünü (statik dosyalar) servis eder.
+  Tüm `@app.get/@app.post` endpoint'leri burada (`/api/login`, `/api/register`,
+  `/api/progress`, `/api/result`, `/api/logs/upload`, `/api/state`, `/api/session/start`,
+  `/api/session/stop`, `/api/session/reset`, `/api/health-check`, `/api/firmware/...`).
+  Her endpoint ince; işi `orch`'a (orchestrator) veya ilgili servise devreder. Ayrıca
+  stdout/stderr'i `logs/app.log`'a aynalayan bir `_Tee` kurar (error_log için). En sonda
+  `app.mount("/")` ile Vue arayüzünü (statik dosyalar) servis eder.
 - [`server/orchestrator.py`](fullservice-backend/server/orchestrator.py) — **Beyin
   (Service katmanı).** Düğüm kaydı, ilerleme toplama, "başlat/durdur/sıfırla"
   komutlarını tüm agent'lara dağıtma (fan-out), health-check. Tüm durum bellekte bir
   `dict`'te tutulur, `threading.RLock` ile korunur (Java'daki `synchronized` gibi).
+  Test sonuçlarını (`record_result`) DB'ye + log'u FTP'ye yazar; tüm testler bitince
+  (kenar-yakalama) bildirim + error_log tetikler.
+- [`server/auth_service.py`](fullservice-backend/server/auth_service.py) — **Login.**
+  `login(username, password)`: önce `cpeteam/cpeteam` varsayılanı, sonra `grk_users`
+  tablosu (bcrypt/md5/sha256/düz metin). DB kapalıyken bile varsayılan hesap çalışır.
+- [`server/db_service.py`](fullservice-backend/server/db_service.py) — **DB yazma.**
+  `create_session` / `update_session_end` / `save_ping` / `save_iperf` / `save_wifi`.
+  Şu an `copy_` staging tablolarına yazar; tablo adları en üstteki sabitlerde (birleştirme
+  tek noktadan). DB yoksa sessizce atlar.
+- [`server/ftp_service.py`](fullservice-backend/server/ftp_service.py) — **FTP yükleme.**
+  `<MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/` klasör yapısına
+  (gerekirse oluşturarak) log yükler; arka planda (daemon thread).
+- [`server/notify.py`](fullservice-backend/server/notify.py) +
+  [`email_sender.py`](fullservice-backend/server/email_sender.py) +
+  [`notification_service.py`](fullservice-backend/server/notification_service.py) —
+  **Bildirim.** Telegram (mesaj + özet log dosyaları) ve mail (sadece mesaj). GRK ile
+  birebir. Test bitince `send_completion` çağrılır. Sırlar `get_secret`'tan gelir.
+- [`server/log_capture.py`](fullservice-backend/server/log_capture.py) — **error_log.**
+  `logs/app.log`'un oturum dilimini kesip `FULL_Service_errorlog_<...>.log` olarak
+  FTP'ye yükler (bildirim YOK).
+- [`server/excel_service.py`](fullservice-backend/server/excel_service.py) — Ping/Wifi
+  için Excel üretir (başka oturumda eklendi).
 - [`server/log_collector.py`](fullservice-backend/server/log_collector.py) —
   Agent'lardan gelen log dosyalarını `logs/<BILGISAYAR>/<session>/` altına yazar.
 
@@ -139,7 +162,9 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
   `RegisterRequest`, `StartCommand`, `ProgressUpdate`. Bunlar **pydantic** modelleridir
   = otomatik JSON ↔ nesne doğrulaması (Java'da Jackson + Bean Validation gibi).
 - [`common/config.py`](fullservice-backend/common/config.py) — `config.json`'u okur;
-  `node_log_folder()`, `detect_lan_ip()` gibi yardımcılar.
+  `node_log_folder()`, `detect_lan_ip()` gibi yardımcılar. Ayrıca **`get_secret(key)`**:
+  sırları önce ortam değişkeninden, yoksa gitignore'lu `secrets.json`'dan okur (kodda
+  asla hardcoded sır yok).
 - [`common/firmware_db.py`](fullservice-backend/common/firmware_db.py) — Marka/Model/
   Firmware için PostgreSQL erişimi (SSL). Bağlantı kurulamazsa **çökmez**, üst katman
   serbest-metne düşer.
@@ -202,7 +227,14 @@ fonksiyonu doğrudan parametre olarak geçiyoruz.
 | Statik IP / arayüz / log klasör adı | `config.json` → `network.assignments`, `nodes[].log_name` |
 | Varsayılan süre / youtube linki / magnet | `config.json` → `defaults` |
 | Bir endpoint eklemek/düzeltmek | `server/main.py` (+ mantık `orchestrator.py`) |
+| Log dosya adı standardı | `common/runners/base.py` → `grk_style_filename`, `RunContext.grk_log_path` |
+| DB'ye hangi tabloya yazılıyor (birleştirme) | `server/db_service.py` → en üstteki tablo adı sabitleri (`T_SESSION`…) |
+| FTP klasör yapısı / test tipi eşlemesi | `server/ftp_service.py` → `build_target_dir`, `test_type_from_*` |
+| Bildirim metni / alıcılar / tetikleme | `server/notification_service.py` (metin), `orchestrator._on_session_complete` (tetik) |
+| Login / şifre doğrulama | `server/auth_service.py` (varsayılan hesap + `grk_users`) |
+| Sırlar (Telegram/SMTP) | `secrets.json` veya ortam değişkeni; okuyucu `common/config.get_secret` |
 | Test ilerleme/renk/etiket (arayüz) | `fullservice-frontend/src/components/TestRow.vue`, `protocol.TEST_LABELS` |
+| Login / karşılama (arayüz) | `components/Login.vue`, `components/Welcome.vue`, `store/auth.js` |
 | Sol form / oturum özeti (arayüz) | `fullservice-frontend/src/components/DeviceForm.vue` |
 | Sağ panel / health-check (arayüz) | `fullservice-frontend/src/components/StatusPanel.vue`, `store/app.js` |
 
