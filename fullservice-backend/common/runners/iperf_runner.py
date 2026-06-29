@@ -25,7 +25,10 @@ from common.runners.base import RunContext, NO_WINDOW, open_log_viewer, close_te
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
     server = (params.iperf_server or "").strip()
-    log_file = ctx.log_path("iperf")
+    # GRK ile aynı standart: FULL_Service_iperf_<brand>_<model>_<fw>_<server_ip>_<ts>.txt
+    sanitized_server = server.replace(".", "").replace(":", "")
+    log_file = ctx.grk_log_path("iperf", params.brand, params.model, params.firmware,
+                                sanitized_server)
 
     if not server:
         ctx.progress(100.0, TestStatus.ERROR.value,

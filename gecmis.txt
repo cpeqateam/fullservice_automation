@@ -102,6 +102,51 @@ test_name her satirda 'FULL_SERVIS'. node_name = config'deki log_name
    Beklenen: test_name='FULL_SERVIS', node_name dolu, firmware_id dogru.
 
 --------------------------------------------------------------------------
+ LOG ISIMLENDIRME + LOGIN EKRANI (2026-06-29)
+--------------------------------------------------------------------------
+1) LOG DOSYA ADLARI artik GRK ile AYNI standartta; tek fark 'grk' yerine
+   'FULL_Service'. base.py'ye grk_style_filename + RunContext.grk_log_path eklendi.
+   TestParams'a brand/model/firmware eklendi (orchestrator dolduruyor).
+   Ornekler:
+     FULL_Service_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+     FULL_Service_wifiAnaliz_<brand>_<model>_<fw>_54sn_<ts>.txt
+     FULL_Service_iperf_<brand>_<model>_<fw>_<serverip>_<ts>.txt
+   ping/iperf/iperf_server/wifiAnaliz/youtube/torrent runner'lari guncellendi.
+   (FTP test-tipi cozumu dosya adindan calismaya devam ediyor: iperf/ping/wifi...)
+
+2) LOGIN EKRANI eklendi (GRK gibi). Kullanicilar GRK ile AYNI tablodan
+   (grk_users) dogrulanir. server/auth_service.py + POST /api/login.
+   VARSAYILAN hesap DAIMA gecerli (DB kapali olsa bile): cpeteam / cpeteam.
+   Sifre formatlari: bcrypt/md5/sha256/duz metin.
+   Frontend: src/store/auth.js (token localStorage), src/components/Login.vue,
+   App.vue artik giris yapilmadan dashboard'u gostermiyor; sol cekmecede
+   kullanici adi + "Cikis Yap". npm run build YAPILDI (dist guncel).
+   ONEMLI: frontend degisince tekrar 'cd fullservice-frontend && npm run build'.
+
+--------------------------------------------------------------------------
+ DUZELTMELER + WIFI GRK SCRIPTI + ARAYUZ (2026-06-29 #2)
+--------------------------------------------------------------------------
+1) LOGIN "Method Not Allowed" SEBEBI: frontend yeniden build edildi (login ekrani
+   geliyor) ama PYTHON SUNUCU eski surecte calisiyordu (/api/login rotasi yok) →
+   POST static mount'a dusup 405 veriyordu. COZUM: run_server.py'yi YENIDEN BASLAT.
+   (StaticFiles dist'i canli okur ama rotalar surec basinda sabitlenir.)
+2) ARAYUZ HATALARI artik kisa/Turkce/yoneticiye yonlendiren: store/auth.js
+   mapLoginError (401=kullanici/sifre, 503=DB yok, 405/404=sunucu guncel degil,
+   baglanti yok=sunucuya ulasilamiyor). Hep "...sistem yoneticinize basvurun."
+3) WIFI ANALIZ = GRK functionBase_wifi.py'nin BIREBIR AYNISI. wifi_util.py tamamen
+   onun scripti yapildi (sadece CLI initialIO+pyfiglet cikarildi; readWlan/
+   getSignalInfo/getSystemInfo/getOneTimeInfo/getPeriodicData/createFileName AYNEN).
+   wifi_util_mac.py = onun darwin kolu birebir + ortak fonksiyonlar paylasilir.
+   wifi_track_runner saniyede 1 ornek alir, satiri GRK getPeriodicData ile BAYT BAYT
+   ayni yazar (_grk_line) → bant genisligi (RX/TX) artik sonuclarda VAR. DB ozeti
+   bu ornekfrom toplanir. Takim liderinin koduna dokunulmadi.
+4) ARAYUZ: sag ustteki "HAZIR/CALISIYOR" chip KALDIRILDI; yerine giris yapan
+   kullanici adi yaziyor (Topbar). Login sonrasi GRK gibi KARSILAMA ekrani
+   (Welcome.vue: logo + "Hos Geldiniz <kullanici>" + "Test Ekranina Gir" butonu) →
+   butona basinca panele gecer. App.vue akisi: Login → Welcome → Panel.
+   npm run build YAPILDI.
+
+--------------------------------------------------------------------------
  SIRADAKI ADIMLAR (yapilacaklar)
 --------------------------------------------------------------------------
 [ ] copy_ tablolarina yazma sahada test edilecek (4 makine).

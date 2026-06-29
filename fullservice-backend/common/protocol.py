@@ -72,6 +72,10 @@ class TestParams(BaseModel):
     torrent_magnet: str = ""   # Windows torrent testi için magnet link (qBittorrent'e eklenir)
     torrent_recycle_gb: float = 5  # bu kadar GB inince hepsini silip yeniden başlat (0 = sadece %100'de sil)
     duration: int = 60         # saniye (ping paket sayısı / test süresi)
+    # Cihaz bilgisi — GRK ile aynı standartta log dosyası adlandırmak için runner'lara taşınır
+    brand: str = "Unknown"
+    model: str = "Unknown"
+    firmware: str = "Unknown"
     extra: Dict[str, Any] = {}
 
 

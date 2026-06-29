@@ -8,6 +8,10 @@ const api = axios.create({
   timeout: 8000,
 })
 
+// Kullanıcı girişi — grk_users'tan doğrulanır; DB kapalıysa cpeteam/cpeteam her zaman geçerli.
+export const login = (username, password) =>
+  api.post('/login', { username, password }).then((r) => r.data)
+
 export const fetchState = () => api.get('/state').then((r) => r.data)
 
 export const startSession = (overrides) => api.post('/session/start', overrides).then((r) => r.data)

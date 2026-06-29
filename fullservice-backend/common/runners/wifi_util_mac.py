@@ -1,32 +1,30 @@
+# -*- coding: utf-8 -*-
 """
-Wi-Fi izleme — macOS WLAN okuma (system_profiler).
+Wi-Fi izleme — macOS versiyonu.
 
-GRK functionBase_wifi'nin macOS koluna dayanır. `system_profiler SPAirPortDataType`
-çıktısını parse edip netsh benzeri satırlara çevirir; böylece [wifi_util.py]'deki
-ortak parse/yazma yardımcıları (getSignalInfo, sample_once, getOneTimeInfo) macOS'ta
-da aynen çalışır.
-
-NOT: Mac'te wifi_track ölçümü biraz farklı olabiliyor; takım liderinden gelecek
-gerçek mac koduyla bu dosyayı (özellikle readWlan) değiştir. Şimdilik GRK'daki
-çalışan macOS yaklaşımının portudur.
+GRK functionBase_wifi.py'deki readWlan'ın macOS (darwin) kolunun BİREBİR AYNISIDIR.
+`system_profiler SPAirPortDataType` çıktısını netsh-benzeri satırlara çevirir; böylece
+parse/yazma fonksiyonları (getSignalInfo, getSystemInfo, getOneTimeInfo,
+getPeriodicData, createFileName, writeLogsToFile, SPACER) Windows ile AYNI olur —
+bunlar wifi_util'den paylaşılarak alınır (tek kaynak, tek standart).
 """
-import re
 import subprocess
+import re
+
+from common.runners.wifi_util import (
+    NO_WINDOW, SPACER,
+    getSignalInfo, getSystemInfo, writeLogsToFile, getOneTimeInfo,
+    createFileName, getPeriodicData,
+)
 
 
 def readWlan():
-    """macOS: system_profiler çıktısını netsh-benzeri satır listesine çevirir.
+    """macOS: system_profiler çıktısını netsh-benzeri satır listesine çevirir
+    (GRK functionBase_wifi.py darwin kolu, birebir)."""
+    cmd = "system_profiler SPAirPortDataType"
+    shellOutput = subprocess.run(cmd, shell=True, capture_output=True, text=True, creationflags=NO_WINDOW).stdout
 
-    NOT: `system_profiler SPAirPortDataType` macOS'ta bazen çok yavaştır / asılı
-    kalır (kullanıcı gözleminde örnekleme 32/33'te takıldı). Bu yüzden timeout ile
-    çağrılır; süre aşarsa boş çıktıyla devam edilir (o örnek "disconnected" yazılır,
-    döngü takılmaz)."""
-    try:
-        out = subprocess.run("system_profiler SPAirPortDataType", shell=True,
-                             capture_output=True, text=True, timeout=8).stdout
-    except Exception as e:
-        print(f"[WIFI-MAC] system_profiler okunamadi/timeout: {e}")
-        out = ""
+    simulated_netsh = []
 
     bssid = "00:00:00:00:00:00"
     ssid = "Unknown"
@@ -37,9 +35,10 @@ def readWlan():
     channel = "1"
     radio = "802.11"
     mac_address = "00:00:00:00:00:00"
+
     is_connected = False
 
-    for line in out.split("\n"):
+    for line in shellOutput.split("\n"):
         line = line.strip()
         if line.startswith("Status: Connected"):
             state = "connected"
@@ -47,13 +46,12 @@ def readWlan():
         elif line.startswith("MAC Address:") and mac_address == "00:00:00:00:00:00":
             mac_address = line.split(":", 1)[1].strip()
         elif is_connected and line.startswith("Channel:"):
-            m = re.search(r"Channel:\s*(\d+)", line)
-            if m:
-                channel = m.group(1)
+            ch_match = re.search(r'Channel:\s*(\d+)', line)
+            if ch_match: channel = ch_match.group(1)
         elif is_connected and line.startswith("Signal / Noise:"):
-            m = re.search(r"Signal / Noise:\s*([-\d]+)", line)
-            if m:
-                rssi = int(m.group(1))
+            sig_match = re.search(r'Signal / Noise:\s*([-\d]+)', line)
+            if sig_match:
+                rssi = int(sig_match.group(1))
                 pct = max(0, min(100, 2 * (rssi + 100)))
                 signal = f"{pct}%"
         elif is_connected and line.startswith("Transmit Rate:"):
@@ -62,21 +60,19 @@ def readWlan():
         elif is_connected and line.startswith("PHY Mode:"):
             radio = line.split(":", 1)[1].strip()
 
-    sim = [
-        "    Name                   : Wi-Fi",
-        "    Description            : AirPort",
-        f"    State                  : {state}",
-        f"    Physical address       : {mac_address}",
-    ]
+    simulated_netsh.append(f"    Name                   : Wi-Fi")
+    simulated_netsh.append(f"    Description            : AirPort")
+    simulated_netsh.append(f"    State                  : {state}")
+    simulated_netsh.append(f"    Physical address       : {mac_address}")
+
     if state == "connected":
-        sim += [
-            f"    SSID                   : {ssid}",
-            f"    BSSID                  : {bssid}",
-            "    Network type           : Infrastructure",
-            f"    Radio type             : {radio}",
-            f"    Channel                : {channel}",
-            f"    Receive rate (Mbps)    : {rx_rate}",
-            f"    Transmit rate (Mbps)   : {tx_rate}",
-            f"    Signal                 : {signal}",
-        ]
-    return sim
+        simulated_netsh.append(f"    SSID                   : {ssid}")
+        simulated_netsh.append(f"    BSSID                  : {bssid}")
+        simulated_netsh.append(f"    Network type           : Infrastructure")
+        simulated_netsh.append(f"    Radio type             : {radio}")
+        simulated_netsh.append(f"    Channel                : {channel}")
+        simulated_netsh.append(f"    Receive rate (Mbps)    : {rx_rate}")
+        simulated_netsh.append(f"    Transmit rate (Mbps)   : {tx_rate}")
+        simulated_netsh.append(f"    Signal                 : {signal}")
+
+    return simulated_netsh

@@ -34,6 +34,25 @@ ProgressCb = Callable[[float, str, str], None]
 #   kind: "ping" | "iperf" | "wifi"   stats: teste özgü alanları içeren dict
 ResultCb = Callable[[str, dict], None]
 
+# Log dosyası adlandırma — GRK ile AYNI standart; tek fark 'grk' yerine 'FULL_Service'.
+PROJECT_TAG = "FULL_Service"
+
+
+def _name_part(s) -> str:
+    """Cihaz alanını (brand/model/firmware) dosya adına uygun hale getirir (boşlukları at)."""
+    return (str(s).strip() if s is not None else "") .replace(" ", "") or "Unknown"
+
+
+def grk_style_filename(kind: str, brand, model, firmware, *extras, ext: str = "txt") -> str:
+    """GRK isimlendirmesinin birebir aynısı (grk → FULL_Service):
+       FULL_Service_<kind>_<brand>_<model>_<firmware>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
+    GRK örnekleri:  grk_ping_..._IPv4_8888_<ts>.txt , grk_wifiAnaliz_..._54sn_<ts>.txt"""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    parts = [PROJECT_TAG, kind, _name_part(brand), _name_part(model), _name_part(firmware)]
+    parts += [str(e) for e in extras if e not in (None, "")]
+    parts.append(ts)
+    return "_".join(parts) + f".{ext}"
+
 
 @dataclass
 class RunContext:
@@ -54,6 +73,17 @@ class RunContext:
         """node ve oturum bilgisini içeren benzersiz bir log dosyası yolu üretir."""
         safe = name.replace(" ", "").replace(":", "").replace("/", "")
         fname = f"full_{self.node_id}_{safe}_{self.stamp()}.txt"
+        os.makedirs(self.log_dir, exist_ok=True)
+        return os.path.join(self.log_dir, fname)
+
+    def grk_log_path(self, kind: str, brand, model, firmware, *extras, ext: str = "txt") -> str:
+        """GRK ile AYNI isimlendirme standardında log dosyası yolu üretir; tek fark
+        baştaki 'grk' yerine 'FULL_Service'. Örnek:
+          GRK  : grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+          BURADA: FULL_Service_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+        kind  : "ping" | "wifiAnaliz" | "iperf" | "youtube" | "torrent" | ...
+        extras: kind'e özgü ek parçalar (topotype, ip, '<sn>sn' vb.)"""
+        fname = grk_style_filename(kind, brand, model, firmware, *extras, ext=ext)
         os.makedirs(self.log_dir, exist_ok=True)
         return os.path.join(self.log_dir, fname)
 

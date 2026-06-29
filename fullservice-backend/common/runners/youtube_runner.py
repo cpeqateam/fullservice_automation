@@ -17,7 +17,8 @@ from common.runners.base import RunContext
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
     link = (params.youtube_link or "").strip()
-    log_file = ctx.log_path("youtube")
+    # GRK ile aynı standart: FULL_Service_youtube_<brand>_<model>_<fw>_<ts>.txt
+    log_file = ctx.grk_log_path("youtube", params.brand, params.model, params.firmware)
 
     if not link:
         ctx.progress(100.0, TestStatus.ERROR.value, "YouTube linki boş.")

@@ -1,22 +1,46 @@
 """
 Wi-Fi Track çalıştırıcı — WLAN sinyal/kanal/rx-tx + sistem kaynaklarını periyodik
-okuyup log'a yazar (GRK wifi analiz portu).
+okuyup log'a yazar.
 
-GRK `wifi_service` + `functionBase_wifi` mantığının dağıtık portudur:
-  • Windows → [wifi_util.py] (netsh)
-  • macOS   → [wifi_util_mac.py] (system_profiler) — geçici, takım liderinden
-              gelecek kodla değiştirilecek
-Her saniye bir örnek alınır; satır log'a yazılır. Kullanıcı isteri: bu test için
-ayrı bir terminal penceresi açılıp örneklerin canlı aktığı görülsün.
+Ölçüm ve satır formatı GRK functionBase_wifi.py ile BİREBİR AYNIDIR:
+  • Windows → [wifi_util.py] (netsh)        ← GRK scriptinin aynısı
+  • macOS   → [wifi_util_mac.py] (system_profiler) ← GRK scriptinin macOS kolu
+Her saniye bir örnek alınır; satır GRK'nın getPeriodicData satırıyla bayt bayt
+aynı biçimde yazılır. Ayrıca özet (DB için) hesaplanır. FULL Servis'e özgü olan
+tek şey döngü kontrolüdür (durdurma/ilerleme/canlı pencere/DB) — ölçüm değerleri
+ve çıktı formatı GRK'nın koduna aittir, değiştirilmemiştir.
 """
 import re
 import statistics
 import time
 from datetime import datetime
+from time import asctime
 
 from common.protocol import TestParams, TestStatus
 from common.runners.base import RunContext, is_mac, open_log_viewer, close_terminal
 from common.runners import wifi_util
+from common.runners.wifi_util import SPACER
+
+
+def _grk_line(signal, systemInfo) -> str:
+    """GRK getPeriodicData'nın tek-iterasyon satırının BİREBİR AYNISI."""
+    logString = "----- "
+    logString += (asctime() + SPACER)
+    if signal and any(str(s).strip() for s in signal):
+        for s in signal:
+            logString += (str(s) + ", ")
+        logString = logString[:-2]
+    else:
+        logString += "00:00:00:00:00:00, disconnected, 0%, 0, 0, 0, N/A"
+    logString += SPACER
+    for s in systemInfo:
+        if isinstance(s, bool):
+            logString += str(s) + ", "
+        else:
+            logString += str(s) + "%, "
+    logString = logString[:-2]
+    logString += "\n"
+    return logString
 
 
 def _num(val):
@@ -28,10 +52,10 @@ def _num(val):
 
 
 def _aggregate(samples: list, start_iso: str, end_iso: str) -> dict:
-    """Toplanan örneklerden wifi özeti üretir.
+    """Toplanan örneklerden wifi özeti (DB için) üretir.
     Her örnek: (signal_list, system_list)
-      signal_list = [bssid, state, signal%, rx, tx, channel, radio]
-      system_list = [cpu, ram, plugged(bool), battery]"""
+      signal_list = [bssid, state, signal%, rx, tx, channel, radio]  (getSignalInfo)
+      system_list = [cpu, ram, plugged(bool), battery]               (getSystemInfo)"""
     sig_vals, rx_vals, tx_vals, cpu_vals, ram_vals = [], [], [], [], []
     connected = 0
     channel = protocol = bssid = None
@@ -84,21 +108,22 @@ def _aggregate(samples: list, start_iso: str, end_iso: str) -> dict:
 
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
-    log_file = ctx.log_path("wifitrack")
     duration = max(1, int(params.duration))
+    # GRK ile aynı standart: FULL_Service_wifiAnaliz_<brand>_<model>_<fw>_<sn>sn_<ts>.txt
+    log_file = ctx.grk_log_path("wifiAnaliz", params.brand, params.model, params.firmware,
+                                f"{duration}sn")
 
-    # Platforma uygun WLAN okuyucu
+    # Platforma uygun WLAN okuyucu (her ikisi de GRK'nın scriptinin aynısı)
     if is_mac():
-        from common.runners import wifi_util_mac
-        read_wlan = wifi_util_mac.readWlan
+        from common.runners import wifi_util_mac as wu
     else:
-        read_wlan = wifi_util.readWlan
+        wu = wifi_util
 
     ctx.progress(0.0, TestStatus.RUNNING.value, "Wi-Fi analizi başlıyor...")
 
-    # Başlık (istemci/cihaz bilgisi)
+    # Başlık (istemci/cihaz bilgisi) — GRK getOneTimeInfo
     try:
-        wifi_util.getOneTimeInfo(read_wlan(), log_file)
+        wifi_util.getOneTimeInfo(wu.readWlan(), log_file)
     except Exception as e:
         with open(log_file, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"[uyari] baslik bilgisi alinamadi: {e}\n")
@@ -107,10 +132,9 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     viewer = open_log_viewer(log_file, f"Wi-Fi Track [{ctx.node_id}]")
 
     start_iso = datetime.now().isoformat(timespec="seconds")
-    samples: list = []   # (signal_list, system_list) — özet için biriktirilir
+    samples: list = []   # (signal, system) — DB özeti için biriktirilir
 
-    def _emit(status_done: bool):
-        """Toplanan örneklerden özet üretip DB'ye gönder (ctx.result varsa)."""
+    def _emit():
         if ctx.result:
             end_iso = datetime.now().isoformat(timespec="seconds")
             ctx.result("wifi", _aggregate(samples, start_iso, end_iso))
@@ -120,12 +144,14 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             if ctx.stop.is_set():
                 close_terminal(viewer)
                 ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "Wi-Fi track durduruldu")
-                _emit(False)
+                _emit()
                 return [log_file]
             start_t = time.time()
-            # Tek WLAN okuması → hem log satırı yaz hem özet için biriktir
+
+            # Tek WLAN okuması (mac'te system_profiler yavaş — çift okuma yok):
+            # GRK'nın getSignalInfo/getSystemInfo'su ile ölç, GRK satır formatıyla yaz.
             try:
-                signal = wifi_util.getSignalInfo(read_wlan())
+                signal = wifi_util.getSignalInfo(wu.readWlan())
             except Exception as e:
                 print(f"[WIFI] okuma hatasi: {e}")
                 signal = []
@@ -133,7 +159,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
                 system = wifi_util.getSystemInfo()
             except Exception:
                 system = ["0", "0", True, 0]
-            wifi_util.writeLogsToFile(wifi_util.format_sample_line(signal, system), log_file)
+            wifi_util.writeLogsToFile(_grk_line(signal, system), log_file)
             samples.append((signal, system))
 
             ctx.progress(((i + 1) / duration) * 100, TestStatus.RUNNING.value,
@@ -145,7 +171,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         with open(log_file, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"\nBitis: {datetime.now()}\n")
         ctx.progress(100.0, TestStatus.COMPLETED.value, "Wi-Fi analizi tamamlandı")
-        _emit(True)
+        _emit()
         return [log_file]
 
     except Exception as e:

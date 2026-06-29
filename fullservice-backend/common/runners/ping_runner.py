@@ -76,7 +76,12 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
         # Linux: -c paket sayısı, -W yanıt bekleme (saniye)
         cmd = ["ping", "-c", str(count), "-W", "1", target]
 
-    log_file = ctx.log_path(f"ping_{label}_{target}")
+    # GRK ile aynı isimlendirme: FULL_Service_ping_<brand>_<model>_<fw>_<IPv4/IPv6>_<ip>_<ts>.txt
+    is_ipv6 = ":" in (target or "")
+    topotype = "IPv6" if is_ipv6 else "IPv4"
+    sanitized_ip = (target or "").replace(".", "").replace(":", "")
+    log_file = ctx.grk_log_path("ping", params.brand, params.model, params.firmware,
+                                topotype, sanitized_ip)
     start_iso = datetime.now().isoformat(timespec="seconds")
     ctx.progress(0.0, TestStatus.RUNNING.value, f"{label} başlıyor → {target}")
 

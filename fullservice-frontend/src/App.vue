@@ -2,6 +2,11 @@
   <v-app :theme="appStore.isDarkMode ? 'dark' : 'light'" class="app-root">
     <LiquidBackground />
 
+    <!-- Giriş yapılmadıysa sadece login ekranı -->
+    <Login v-if="!auth.isAuthenticated" />
+
+    <!-- Giriş yapıldıysa tüm uygulama (üst bar + çekmece + içerik) -->
+    <template v-else>
     <Topbar />
 
     <!-- Sol gezinme çekmecesi (hamburger ile açılır) -->
@@ -34,12 +39,43 @@
           @click="appStore.setView('profile')"
         />
       </v-list>
+
+      <!-- Alt: giriş yapan kullanıcı + çıkış -->
+      <template #append>
+        <v-divider class="border-opacity-15" />
+        <div class="pa-3">
+          <div class="d-flex align-center px-2 mb-2">
+            <v-icon size="20" class="mr-2">mdi-account-circle</v-icon>
+            <span class="text-body-2 font-weight-medium">{{ auth.displayName }}</span>
+          </div>
+          <v-btn
+            block
+            variant="tonal"
+            color="error"
+            prepend-icon="mdi-logout"
+            rounded="lg"
+            @click="onLogout"
+          >
+            Çıkış Yap
+          </v-btn>
+        </div>
+      </template>
     </v-navigation-drawer>
 
     <v-main>
       <v-container fluid class="py-6">
+        <!-- ── KARŞILAMA (landing) ── -->
+        <v-row v-if="appStore.currentView === 'landing'">
+          <v-col cols="12" md="9" lg="9">
+            <Welcome @enter="goPanel" />
+          </v-col>
+          <v-col cols="12" md="3" lg="3">
+            <StatusPanel />
+          </v-col>
+        </v-row>
+
         <!-- ── PANEL (dashboard) ── -->
-        <v-row v-if="appStore.currentView === 'dashboard'">
+        <v-row v-else-if="appStore.currentView === 'dashboard'">
           <!-- Sol: cihaz/test formu — tam yükseklik -->
           <v-col cols="12" md="4" lg="3">
             <DeviceForm class="fill-col" />
@@ -83,19 +119,46 @@
       <v-spacer />
       <span>Türk Telekom · CPE QA · Otomatik yenileme 1 sn</span>
     </v-footer>
+    </template>
   </v-app>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, computed } from 'vue'
+import { onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useAppStore } from '@/store/app'
+import { useAuthStore } from '@/store/auth'
 import LiquidBackground from '@/components/LiquidBackground.vue'
+import Login from '@/components/Login.vue'
+import Welcome from '@/components/Welcome.vue'
 import Topbar from '@/components/Topbar.vue'
 import DeviceForm from '@/components/DeviceForm.vue'
 import StatusPanel from '@/components/StatusPanel.vue'
 import NodeCard from '@/components/NodeCard.vue'
 
 const appStore = useAppStore()
+const auth = useAuthStore()
+
+function startApp() {
+  appStore.startPolling(1000)
+  appStore.loadBrands()
+}
+function stopApp() {
+  appStore.stopPolling()
+  appStore.stopHealthCheck()
+}
+// Karşılama ekranındaki "Sisteme Giriş" butonu → panel sayfası
+function goPanel() {
+  appStore.setView('dashboard')
+}
+function onLogout() {
+  stopApp()
+  appStore.setView('landing')   // sonraki girişte yine karşılama ekranı
+  appStore.drawerOpen = false
+  auth.logout()
+}
+
+// Giriş yapıldıysa veri akışını başlat, çıkışta durdur (canlı izleme/sağ panel için)
+watch(() => auth.isAuthenticated, (v) => (v ? startApp() : stopApp()))
 
 // Ayarlar/Profil placeholder başlık + ikonu
 const viewMeta = computed(() => {
@@ -105,13 +168,9 @@ const viewMeta = computed(() => {
 })
 
 onMounted(() => {
-  appStore.startPolling(1000)
-  appStore.loadBrands()
+  if (auth.isAuthenticated) startApp()   // sayfa yenilendiyse oturum localStorage'dan gelir
 })
-onBeforeUnmount(() => {
-  appStore.stopPolling()
-  appStore.stopHealthCheck()
-})
+onBeforeUnmount(() => stopApp())
 </script>
 
 <style>

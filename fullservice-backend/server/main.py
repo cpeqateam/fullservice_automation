@@ -40,6 +40,8 @@ from common.protocol import RegisterRequest, ProgressUpdate, ResultReport
 from common import firmware_db
 from server.orchestrator import Orchestrator
 from server import log_collector
+from server import auth_service
+import time
 
 CONFIG = load_config()
 orch = Orchestrator(CONFIG)
@@ -69,6 +71,21 @@ class SessionStartRequest(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    """Kullanıcı girişi. grk_users tablosundan doğrular; DB kapalı olsa bile
+    varsayılan cpeteam/cpeteam hesabı her zaman geçerli."""
+    user = auth_service.login(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Kullanıcı adı veya şifre hatalı.")
+    return {"token": f"token-{user['user_id']}-{int(time.time())}", "user": user}
 
 
 @app.post("/api/register")

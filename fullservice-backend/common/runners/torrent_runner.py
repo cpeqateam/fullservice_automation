@@ -22,7 +22,8 @@ QB_PASS = "Admin123"
 
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
-    log_file = ctx.log_path("torrent")
+    # GRK ile aynı standart: FULL_Service_torrent_<brand>_<model>_<fw>_<ts>.txt
+    log_file = ctx.grk_log_path("torrent", params.brand, params.model, params.firmware)
     magnet = (params.torrent_magnet or "").strip()
 
     if not magnet:

@@ -185,6 +185,10 @@ class Orchestrator:
                 torrent_magnet=overrides.get("torrent_magnet") or self.defaults.get("torrent_magnet", ""),
                 torrent_recycle_gb=float(self.defaults.get("torrent_recycle_gb", 5)),
                 duration=int(overrides.get("duration") or self.defaults.get("duration", 60)),
+                # Cihaz bilgisi — log dosyası adlandırması GRK standardında olsun diye
+                brand=overrides.get("brand") or "Unknown",
+                model=overrides.get("model") or "Unknown",
+                firmware=overrides.get("firmware") or "Unknown",
             )
             self.session = {
                 "session_id": session_id,

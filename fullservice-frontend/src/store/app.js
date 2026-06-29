@@ -40,7 +40,7 @@ export const useAppStore = defineStore('app', {
 
     // Arayüz gezinmesi (sol çekmece + aktif görünüm)
     drawerOpen: false,
-    currentView: 'dashboard',   // 'dashboard' | 'settings' | 'profile'
+    currentView: 'landing',   // 'landing' | 'dashboard' | 'settings' | 'profile'
 
     // Backend'den gelen birleşik durum (orchestrator.get_state)
     session:     { session_id: null, running: false, started_at: null, ended_at: null, params: {}, device: {} },

@@ -20,7 +20,9 @@ from common.runners.base import RunContext, NO_WINDOW, open_log_viewer, close_te
 
 
 def run(params, ctx: RunContext) -> list[str]:
-    log_file = ctx.log_path("iperf_server")
+    # GRK ile aynı standart: FULL_Service_iperf_server_<brand>_<model>_<fw>_<port>_<ts>.txt
+    log_file = ctx.grk_log_path("iperf_server", params.brand, params.model, params.firmware,
+                                str(params.iperf_port))
     duration = max(1, int(params.duration))
     # Server'ı client'tan biraz daha uzun ayakta tut: client'ın bağlanması ve
     # bitirmesi için küçük bir tampon (client retry ile başlangıç gecikmesini tolere eder).

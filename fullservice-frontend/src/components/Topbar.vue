@@ -10,8 +10,8 @@
     <div
       class="brand pl-2 pr-2 d-flex align-center brand-clickable"
       role="button"
-      title="Panele dön"
-      @click="appStore.setView('dashboard')"
+      title="Karşılama ekranına dön"
+      @click="appStore.setView('landing')"
     >
       <img
         src="https://asset.turktelekom.com.tr/SiteAssets/images/logo.svg"
@@ -26,17 +26,16 @@
 
     <v-spacer />
 
+    <!-- Sağ üstte giriş yapan kullanıcı (GRK gibi) -->
     <v-chip
-      class="session-chip mr-3"
-      :color="chipColor"
-      :prepend-icon="chipIcon"
+      v-if="auth.user"
+      class="user-chip mr-3"
+      color="primary"
+      prepend-icon="mdi-account-circle"
       variant="elevated"
       density="comfortable"
     >
-      {{ chipLabel }}
-      <span v-if="appStore.session.session_id" class="ml-2 session-id">
-        {{ appStore.session.session_id }}
-      </span>
+      {{ auth.displayName }}
     </v-chip>
 
     <v-btn
@@ -49,27 +48,11 @@
 </template>
 
 <script setup>
-// Üst bar: logo/başlık + oturum durumu chip'i (HAZIR/ÇALIŞIYOR/TAMAMLANDI) + tema toggle.
-// Durumu store.session'dan okur; mantık taşımaz, yalnızca gösterir.
-import { computed } from 'vue'
+// Üst bar: logo/başlık + giriş yapan kullanıcı + tema toggle.
 import { useAppStore } from '@/store/app'
+import { useAuthStore } from '@/store/auth'
 const appStore = useAppStore()
-
-const chipLabel = computed(() => {
-  if (appStore.session.running) return 'ÇALIŞIYOR'
-  if (appStore.session.session_id) return 'TAMAMLANDI'
-  return 'HAZIR'
-})
-const chipColor = computed(() => {
-  if (appStore.session.running) return 'warning'
-  if (appStore.session.session_id) return 'success'
-  return 'grey-darken-1'
-})
-const chipIcon = computed(() => {
-  if (appStore.session.running) return 'mdi-play-circle'
-  if (appStore.session.session_id) return 'mdi-check-circle'
-  return 'mdi-circle-outline'
-})
+const auth = useAuthStore()
 </script>
 
 <style scoped lang="scss">
@@ -101,6 +84,5 @@ const chipIcon = computed(() => {
   letter-spacing: 0.3px;
 }
 .menu-btn { opacity: 0.85; }
-.session-chip { font-weight: 600; letter-spacing: 0.6px; }
-.session-id { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; opacity: 0.8; }
+.user-chip { font-weight: 600; letter-spacing: 0.3px; }
 </style>
