@@ -140,16 +140,23 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             ctx.result("wifi", _aggregate(samples, start_iso, end_iso))
 
     try:
-        for i in range(duration):
+        # ÖNEMLİ: döngü örnek SAYISINA değil GERÇEK SÜREYE bağlıdır. macOS'ta WLAN
+        # okuması (system_profiler) çağrı başına birkaç saniye sürer; "1 örnek/sn"
+        # varsayımı orada testi 'duration' yerine kat kat uzatıp tamamlanmamış
+        # gösteriyordu. Artık test her platformda ~'duration' saniyede biter
+        # (Windows'ta ~1 örnek/sn; macOS'ta okuma kadar daha az örnek).
+        loop_start = time.time()
+        i = 0
+        stopped = False
+        while True:
             if ctx.stop.is_set():
-                close_terminal(viewer)
-                ctx.progress((i / duration) * 100, TestStatus.STOPPED.value, "Wi-Fi track durduruldu")
-                _emit()
-                return [log_file]
-            start_t = time.time()
+                stopped = True
+                break
+            if (time.time() - loop_start) >= duration:
+                break
+            sample_t = time.time()
 
-            # Tek WLAN okuması (mac'te system_profiler yavaş — çift okuma yok):
-            # GRK'nın getSignalInfo/getSystemInfo'su ile ölç, GRK satır formatıyla yaz.
+            # Tek WLAN okuması: GRK getSignalInfo/getSystemInfo ile ölç, GRK satırı yaz.
             try:
                 signal = wifi_util.getSignalInfo(wu.readWlan())
             except Exception as e:
@@ -161,12 +168,25 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
                 system = ["0", "0", True, 0]
             wifi_util.writeLogsToFile(_grk_line(signal, system), log_file)
             samples.append((signal, system))
+            i += 1
 
-            ctx.progress(((i + 1) / duration) * 100, TestStatus.RUNNING.value,
-                         f"Wi-Fi analizi {i + 1}/{duration} sn")
-            elapsed = time.time() - start_t
-            if elapsed < 1.0:
-                time.sleep(1.0 - elapsed)
+            elapsed = time.time() - loop_start
+            ctx.progress(min(99.0, (elapsed / duration) * 100), TestStatus.RUNNING.value,
+                         f"Wi-Fi analizi {min(int(elapsed), duration)}/{duration} sn ({i} ornek)")
+
+            # Hızlı okuma (Windows netsh) ise saniyeye tamamla → ~1 örnek/sn.
+            # Yavaş okuma (macOS system_profiler) ise bekleme yok → süre aşılmaz.
+            sample_dt = time.time() - sample_t
+            remaining = duration - (time.time() - loop_start)
+            if sample_dt < 1.0 and remaining > 0:
+                time.sleep(min(1.0 - sample_dt, remaining))
+
+        if stopped:
+            close_terminal(viewer)
+            ctx.progress(min(99.0, ((time.time() - loop_start) / duration) * 100),
+                         TestStatus.STOPPED.value, "Wi-Fi track durduruldu")
+            _emit()
+            return [log_file]
 
         with open(log_file, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"\nBitis: {datetime.now()}\n")
