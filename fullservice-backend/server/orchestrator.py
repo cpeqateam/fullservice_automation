@@ -104,11 +104,20 @@ class Orchestrator:
 
     _TERMINAL = {"completed", "error", "stopped"}
 
+    # Bildirimi/tamamlanmayı belirleyen "ölçüm" testleri. Torrent ve youtube sonsuz
+    # yük basıcıdır (ancak Durdur'a basınca biter), iperf_server yalnızca dinleyicidir —
+    # bunlar bitişi belirlemez; aksi halde torrent hiç bitmediği için bildirim
+    # hiçbir zaman tetiklenmezdi.
+    _COMPLETION_ROLES = {"ping_internet", "ping_modem", "iperf", "wifi_track"}
+
     def _all_tests_terminal(self) -> bool:
-        """Rolü olan tüm testler bitiş durumunda mı (completed/error/stopped)?"""
+        """Ölçüm testleri (ping/iperf/wifi_track) bitiş durumunda mı (completed/error/stopped)?
+        Sonsuz yük (torrent/youtube) ve dinleyici (iperf_server) dikkate ALINMAZ."""
         has_any = False
         for node in self.nodes.values():
             for r in node.get("roles", []):
+                if r not in self._COMPLETION_ROLES:
+                    continue
                 has_any = True
                 if node["tests"].get(r, {}).get("status") not in self._TERMINAL:
                     return False
@@ -134,10 +143,10 @@ class Orchestrator:
             t["updated"] = datetime.now().isoformat(timespec="seconds")
             after = self._all_tests_terminal()
 
-            # Test bittiğinde (tüm testler terminal) — kenar yakalama ile bir kez.
-            # running'e bakMIYORUZ: torrent gibi sonsuz testler ancak /stop sonrası
-            # terminal olur ve o an running zaten False'tur. session_id varsa (gerçek
-            # bir koşu) tetikle; yeni "Başlat" yeni session_id → her koşu yeniden bildirir.
+            # Ölçüm testleri (ping/iperf/wifi_track) bitince — kenar yakalama ile bir kez.
+            # Torrent/youtube (sonsuz yük) beklenmez; onlar Durdur'a kadar sürebilir.
+            # session_id varsa (gerçek bir koşu) tetikle; yeni "Başlat" yeni
+            # session_id → her koşu yeniden bildirir.
             if self.session.get("session_id") and not before and after:
                 fire = {
                     "device":     dict(self.session.get("device", {})),
