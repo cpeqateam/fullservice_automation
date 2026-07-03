@@ -70,10 +70,13 @@ CREATE TABLE yedek_grk_ping_test     AS SELECT * FROM grk_ping_test;
 CREATE TABLE yedek_grk_wifi_analysis AS SELECT * FROM grk_wifi_analysis;
 CREATE TABLE yedek_grk_speed_test    AS SELECT * FROM grk_speed_test;
 ```
-> ✅ **Beklenen:** 6 `yedek_*` tablosu oluştu. Kontrol:
+> ✅ **Beklenen:** 6 `yedek_*` tablosu oluştu; her biri kaynağıyla **AYNI sayıda** satır.
+> (Kesin sayıyı önceden bilemeyiz — istatistikler yaklaşık; `COUNT(*)` kesindir.)
 > ```sql
-> SELECT (SELECT count(*) FROM yedek_grk_test_session)  AS ts,   -- 9 olmalı
->        (SELECT count(*) FROM yedek_grk_ping_test)      AS ping; -- 16 olmalı
+> SELECT (SELECT count(*) FROM yedek_grk_test_session) AS yedek_ts,
+>        (SELECT count(*) FROM grk_test_session)        AS kaynak_ts,   -- yedek_ts ile EŞİT
+>        (SELECT count(*) FROM yedek_grk_ping_test)      AS yedek_ping,
+>        (SELECT count(*) FROM grk_ping_test)            AS kaynak_ping; -- yedek_ping ile EŞİT
 > ```
 
 ## SQL-1 — firmware + users gerçek tablo (view'ı sil, tablo kur)
@@ -120,16 +123,14 @@ ALTER TABLE test_session ADD COLUMN IF NOT EXISTS node_name      VARCHAR(50);
 ALTER TABLE test_session ADD COLUMN IF NOT EXISTS has_iperf_test BOOLEAN DEFAULT FALSE;
 COMMIT;
 ```
-> ✅ **Beklenen:** 5 ad artık gerçek TABLE. Kontrol:
+> ✅ **Beklenen:** 5 ad artık gerçek TABLE (view değil). Asıl kontrol bu:
 > ```sql
 > SELECT relname, relkind FROM pg_class
 > WHERE relname IN ('test_session','ping_test','wifi_analysis','speed_test','iperf_test')
-> ORDER BY relname;   -- hepsi relkind='r'
-> -- şu an sadece FULL staging verisi var:
-> SELECT count(*) FROM test_session;   -- 13    (copy_test_session'dan geldi)
-> SELECT count(*) FROM ping_test;      -- 83
-> SELECT count(*) FROM iperf_test;     -- 10
+> ORDER BY relname;   -- 5 satır, hepsi relkind='r'
 > ```
+> Satır sayıları şu an sadece FULL staging kadardır (copy_'den geldiği kadar; kesin sayı
+> önemli değil, GRK verisi henüz gelmedi).
 
 ## SQL-3 — GRK verisini taşı (FULL staging SİLİNMEZ; GRK satırları yeni id alır)
 
@@ -192,13 +193,15 @@ ALTER TABLE test_session DROP COLUMN _old_session_id;
 
 COMMIT;
 ```
-> ✅ **Beklenen:** GRK verisi kopyalandı, FULL verisi durmakta. Kontrol:
+> ✅ **Beklenen:** GRK verisi kopyalandı, FULL verisi durmakta. Asıl kontrol: GRK
+> sayısı kaynağıyla **EŞİT** olmalı.
 > ```sql
 > SELECT test_name, count(*) FROM test_session GROUP BY 1 ORDER BY 1;
-> --  GRK        9
-> --  FULL_SERVIS 13
-> SELECT (SELECT count(*) FROM grk_ping_test) AS grk,
->        (SELECT count(*) FROM ping_test WHERE test_name='GRK') AS yeni;  -- 16 = 16
+> -- GRK satır sayısı = grk_test_session sayısı; FULL_SERVIS = değişmedi
+> SELECT (SELECT count(*) FROM grk_test_session) AS grk_kaynak,
+>        (SELECT count(*) FROM test_session WHERE test_name='GRK') AS yeni;  -- EŞİT olmalı
+> SELECT (SELECT count(*) FROM grk_ping_test) AS grk_kaynak,
+>        (SELECT count(*) FROM ping_test WHERE test_name='GRK') AS yeni;     -- EŞİT olmalı
 > SELECT DISTINCT node_name FROM ping_test WHERE test_name='GRK';  -- GRK setup adları
 > ```
 > `iperf_test`'e GRK verisi eklenmez (GRK'da iperf yok); FULL testleriyle dolar.
