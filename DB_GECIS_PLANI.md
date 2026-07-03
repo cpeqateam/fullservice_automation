@@ -205,8 +205,12 @@ COMMIT;
 >        (SELECT count(*) FROM test_session WHERE test_name='GRK') AS yeni;  -- EŞİT olmalı
 > SELECT (SELECT count(*) FROM grk_ping_test) AS grk_kaynak,
 >        (SELECT count(*) FROM ping_test WHERE test_name='GRK') AS yeni;     -- EŞİT olmalı
-> SELECT DISTINCT node_name FROM ping_test WHERE test_name='GRK';  -- GRK setup adları
+> SELECT DISTINCT station_name FROM grk_test_session;  -- büyük ihtimalle NULL
 > ```
+> **NOT:** GRK setup'ı DB'ye yazmıyorsa (`station_name` NULL) GRK satırlarında `node_name`
+> de NULL olur — bu NORMAL, veri kaybı değil. İleride GRK cutover'da (Prompt A) yeni
+> testlerde `node_name` setup ile dolar; eski satırlar NULL kalır. FULL satırlarında
+> `node_name` zaten makine adıyla doludur.
 > `iperf_test`'e GRK verisi eklenmez (GRK'da iperf yok); FULL testleriyle dolar.
 > Sorun görürsen `COMMIT` yerine `ROLLBACK`.
 
@@ -221,19 +225,23 @@ DB'de ortak sonuç tabloları kuruldu (copy_ staging tabloları final adlara yü
 FULL Servis artık bunlara yazacak. Şu değişiklikleri yap, başka bir şeyi değiştirme:
 
 fullservice-backend/server/db_service.py — en üstteki tablo adı sabitleri:
-   T_SESSION = "test_session"
-   T_PING    = "ping_test"
-   T_SPEED   = "speed_test"
-   T_WIFI    = "wifi_analysis"
-   T_IPERF   = "iperf_test"
-   (T_FIRMWARE şimdilik "grk_firmware" kalsın — firmware/users cutover'da bağlanacak.)
+   T_SESSION  = "test_session"
+   T_PING     = "ping_test"
+   T_SPEED    = "speed_test"
+   T_WIFI     = "wifi_analysis"
+   T_IPERF    = "iperf_test"
+   T_FIRMWARE = "firmware"
+
+FULL Servis TAMAMEN yeni yapıya alınıyor (canlı değil, tam geçiş yapılabilir):
+ - common/firmware_db.py: get_brands/get_models/get_versions sorgularında
+   "grk_firmware" -> "firmware".
+ - server/auth_service.py: "grk_users" -> "users".
 
 create_session'a has_iperf desteği ekle:
  - create_session(...) imzasına has_iperf parametresi + test_session INSERT'ine
    has_iperf_test kolonu.
  - orchestrator: oturumda iperf rolü varsa create_session'a has_iperf=True geçsin.
 
-firmware_db.py ve auth_service.py'ye DOKUNMA (grk_firmware/grk_users canlı okunuyor).
 test_name zaten 'FULL_SERVIS', node_name zaten makine adı — değiştirme.
 ```
 > ✅ **Beklenen (Faz 4):** Sunucu restart sonrası bir FULL testi koş → `test_session`'a
@@ -297,11 +305,12 @@ Not: Sadece tablo/kolon adları değişir; iş mantığını ve testleri koru.
 
 Staging (Faz 0–5) doğrulanınca GRK'yı da geçirirken:
 
-1. **GRK kodu:** Prompt A ile geçir, GRK'yı yeniden başlat.
-2. **FULL Servis:** `db_service.py` `T_FIRMWARE="firmware"`; `firmware_db.py`
-   `grk_firmware->firmware`; `auth_service.py` `grk_users->users`.
-3. **FK:** `test_session.firmware_id` FK'sini `grk_firmware`'den `firmware`'e taşı.
-4. **Interim delta:** GRK, staging boyunca `grk_*`'a yazdı. Kopyalama sonrası eklenen
+1. **GRK kodu:** Prompt A ile geçir; Pazartesi test bilgisayarlarındaki exe'leri
+   yeni build ile değiştir (GRK artık yeni tablolara yazar/okur).
+2. **FK repoint:** `test_session.firmware_id` FK'sini `grk_firmware`'den `firmware`'e taşı
+   (FULL Servis Faz 4'te zaten `firmware`/`users` okuyor; bu son bağ). Önce FK adını gör:
+   `SELECT conname FROM pg_constraint WHERE conrelid='test_session'::regclass AND contype='f';`
+3. **Interim delta:** GRK, staging boyunca `grk_*`'a yazdı. Kopyalama sonrası eklenen
    GRK kayıtlarını (`WHERE created_at > <SQL-3 zamanı>`) yeni tablolara aktar
    (SQL-3'teki eşleme yöntemiyle, yeni id vererek).
 5. Her şey oturunca `grk_*`, `copy_*` (kalan) ve `yedek_*` arşivlenir/silinir.
