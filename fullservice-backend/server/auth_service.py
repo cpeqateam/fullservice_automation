@@ -62,7 +62,7 @@ def login(username: str, password: str) -> dict | None:
     try:
         row = db.execute(text(
             "SELECT user_id, name, surname, username, email, password "
-            "FROM grk_users WHERE username = :u"
+            "FROM users WHERE username = :u"
         ), {"u": username}).fetchone()
     except Exception as e:
         print(f"[AUTH] grk_users sorgu hatasi: {e}")

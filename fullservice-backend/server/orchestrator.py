@@ -277,7 +277,7 @@ class Orchestrator:
             started_at = self.session["started_at"]
             device = dict(self.session["device"])
 
-        # DB: oturum satırını (copy_test_session) oluştur — lock dışında (ağ/DB I/O).
+        # DB: oturum satırını (test_session) oluştur — lock dışında (ağ/DB I/O).
         # Hangi test tipleri var? (has_* bayrakları için tüm düğümlerin rollerinin birleşimi)
         roles_all = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])}
         db_session_id = db_service.create_session(
@@ -286,6 +286,7 @@ class Orchestrator:
             has_ping=any(r in roles_all for r in ("ping_internet", "ping_modem")),
             has_speedtest="speedtest" in roles_all,
             has_wifi="wifi_track" in roles_all,
+            has_iperf="iperf" in roles_all,
         )
         with self._lock:
             self.session["db_session_id"] = db_session_id
@@ -335,7 +336,7 @@ class Orchestrator:
         return node_log_folder(node["node_id"], self.config) if node else None
 
     def record_result(self, node_id: str, kind: str, stats: dict, ftp_file_path: str | None = None):
-        """Bir testin nihai özetini ilgili copy_ tablosuna yazar. Hem agent'lardan
+        """Bir testin nihai özetini ilgili sonuç tablosuna yazar. Hem agent'lardan
         (/api/result) hem sunucu-yerel testlerden çağrılır. DB yoksa sessizce atlar.
         ftp_file_path verilmezse sunucu, FTP hedef klasörünü kendisi hesaplar (DB'de
         'bu testin logları FTP'de nerede' işaretçisi olur)."""
@@ -452,7 +453,7 @@ class Orchestrator:
             started_at = self.session.get("started_at")
             ended_at = self.session["ended_at"]
 
-        # DB: oturumun bitiş zamanını/süresini güncelle (copy_test_session)
+        # DB: oturumun bitiş zamanını/süresini güncelle (test_session)
         if db_sid:
             duration = None
             try:

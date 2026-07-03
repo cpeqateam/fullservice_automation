@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import os
 
-from common.config import CERT_DIR
+from common.config import CERT_DIR, get_secret
 
-# Bağlantı adresi — GRK ile aynı cpeqadb. Ortam değişkeni ile override edilebilir.
-DB_URL = os.environ.get(
-    "FS_FIRMWARE_DB_URL",
-    "postgresql://cpeqateam:cpeqateam@78.186.148.93:4749/cpeqadb",
-)
+# Bağlantı adresi (cpeqadb) — SIR: koda konmaz. Önce ortam değişkeni, yoksa
+# gitignore'lu secrets.json'dan okunur (FS_FIRMWARE_DB_URL). Tanımlı değilse boş
+# kalır → engine=None; combobox serbest-metne düşer (uygulama çökmez).
+DB_URL = get_secret("FS_FIRMWARE_DB_URL")
 
 engine = None        # Bağlantı kurulursa SQLAlchemy Engine; aksi halde None
 SessionLocal = None  # Oturum fabrikası
@@ -107,14 +106,14 @@ def _query(sql: str, params: dict | None = None) -> list:
 
 def get_brands() -> list[str]:
     return _query(
-        "SELECT DISTINCT brand FROM grk_firmware "
+        "SELECT DISTINCT brand FROM firmware "
         "WHERE brand IS NOT NULL ORDER BY brand"
     )
 
 
 def get_models(brand: str) -> list[str]:
     return _query(
-        "SELECT DISTINCT model FROM grk_firmware "
+        "SELECT DISTINCT model FROM firmware "
         "WHERE brand = :b AND model IS NOT NULL ORDER BY model",
         {"b": brand},
     )
@@ -122,7 +121,7 @@ def get_models(brand: str) -> list[str]:
 
 def get_versions(brand: str, model: str) -> list[str]:
     return _query(
-        "SELECT DISTINCT firmware_version FROM grk_firmware "
+        "SELECT DISTINCT firmware_version FROM firmware "
         "WHERE brand = :b AND model = :m AND firmware_version IS NOT NULL "
         "ORDER BY firmware_version",
         {"b": brand, "m": model},
