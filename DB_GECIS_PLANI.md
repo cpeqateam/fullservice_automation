@@ -95,8 +95,9 @@ COMMIT;
 ```
 > ✅ **Beklenen:** `firmware`/`users` artık VIEW değil TABLE. Kontrol:
 > ```sql
-> SELECT relname, relkind FROM pg_class
-> WHERE relname IN ('firmware','users');   -- relkind iki satırda da 'r' (tablo) olmalı
+> SELECT table_name, table_type FROM information_schema.tables
+> WHERE table_schema='public' AND table_name IN ('firmware','users');
+> -- ikisi de table_type='BASE TABLE' olmalı (artık VIEW değil)
 > SELECT (SELECT count(*) FROM firmware) AS fw,
 >        (SELECT count(*) FROM grk_firmware) AS grk_fw;   -- EŞİT olmalı (kopya)
 > ```
@@ -126,9 +127,10 @@ COMMIT;
 ```
 > ✅ **Beklenen:** 5 ad artık gerçek TABLE (view değil). Asıl kontrol bu:
 > ```sql
-> SELECT relname, relkind FROM pg_class
-> WHERE relname IN ('test_session','ping_test','wifi_analysis','speed_test','iperf_test')
-> ORDER BY relname;   -- 5 satır, hepsi relkind='r'
+> SELECT table_name, table_type FROM information_schema.tables
+> WHERE table_schema='public'
+>   AND table_name IN ('test_session','ping_test','wifi_analysis','speed_test','iperf_test')
+> ORDER BY table_name;   -- 5 satır, hepsi table_type='BASE TABLE'
 > ```
 > Satır sayıları şu an sadece FULL staging kadardır (copy_'den geldiği kadar; kesin sayı
 > önemli değil, GRK verisi henüz gelmedi).
