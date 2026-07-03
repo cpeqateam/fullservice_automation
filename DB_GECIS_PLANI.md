@@ -97,7 +97,8 @@ COMMIT;
 > ```sql
 > SELECT relname, relkind FROM pg_class
 > WHERE relname IN ('firmware','users');   -- relkind iki satırda da 'r' (tablo) olmalı
-> SELECT count(*) FROM firmware;           -- 3 olmalı (grk_firmware ile aynı)
+> SELECT (SELECT count(*) FROM firmware) AS fw,
+>        (SELECT count(*) FROM grk_firmware) AS grk_fw;   -- EŞİT olmalı (kopya)
 > ```
 > Not: `firmware`/`users`'ı şu an hiçbir kod okumuyor; Faz 6'da (cutover) asıl olacaklar.
 
