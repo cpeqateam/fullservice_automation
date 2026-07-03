@@ -1,288 +1,305 @@
-# DB Geçiş Planı — GRK + FULL Servis Ortak Yapı (Senaryo 3)
+# DB Geçiş Planı — Gerçek Birleşik Tablolar (Senaryo 3)
 
-> FULL Servis'in şu anki **`copy_` staging** tablolarından, GRK ile **ortak tek tablo
-> setine** geçişi. Canlı GRK verisi olduğu için bu bir **migration**'dır (sıfırdan
-> kurulum değil). Sıra: **önce yedek → sonra şema (rename+kolon) → sonra kod (prompt'larla)**.
->
-> Hedef şema görseli: [`DB_YENI_SEMA.drawio`](DB_YENI_SEMA.drawio)
-> SQL komutları ve GRK/FULL kod güncelleme prompt'ları **en altta**.
+> **Nasıl kullanılır:** Aşağıyı **fazlar hâlinde** çalıştır. Her adımın sonunda
+> **✅ Beklenen** kutusu var — çıktın ona uyuyorsa devam et, uymuyorsa bana yaz.
+> SQL'ler pgAdmin'den; kod güncellemeleri ilgili Claude Code'lara (prompt'lar en altta).
+> Amaç: yapboz çözmeden, satır satır okuyup ilerlemen.
 
 ---
 
-## 1. Nerede olduğumuz / nereye gittiğimiz
+## 0. Sistemin haritası (önce bunu anla)
 
-- **Şu an:** FULL Servis `copy_*` tablolarına, GRK `grk_*` canlı tablolarına yazıyor.
-- **Hedef:** İki sistem **aynı** tabloları paylaşır. `grk_` öneki kalkar. Her satır
-  **`test_name`** ile kime ait olduğunu söyler; **`node_name`** hangi kurulum/makine:
-  - FULL Servis → `LINUX / MAC_ETH / MAC_WIFI / WIN_WIFI`
-  - GRK → **seçilen setup adı** (ör. `GRK-1 - 2.4 GHz`), test başlatma sekmesindeki combobox'tan
-- `grk_users` → **`users`** olarak yeniden adlandırılır (isim GRK'ya özgü olmasın).
+| Katman | Ne | Kim kullanıyor |
+|--------|----|----|
+| `grk_*` tablolar | Asıl GRK verisi | **GRK** doğrudan yazar/okur (canlı) |
+| **View'lar** (`firmware`,`users`,`test_session`,`ping_test`,`wifi_analysis`,`speed_test`) | `SELECT * FROM grk_*` geçişi | **grk-test-platform** (okuma paneli) `test_session/ping_test/wifi_analysis/speed_test`'i okur |
+| `copy_*` tablolar | FULL Servis staging | FULL Servis yazar |
 
----
+**Doğrulandı:** GRK kodu view'ları HİÇ kullanmıyor (`grk_firmware`, `grk_test_session`…
+doğrudan). Yani **view'ları silmek GRK'yı etkilemez.** Sadece grk-test-platform bu
+view'ları okuyordu → onu yeni tablolara yönlendireceğiz.
 
-## 2. Hedef yapı (özet)
-
-| Tablo (yeni ad) | Eski ad | Eklenen kolonlar |
-|-----------------|---------|------------------|
-| `firmware` | grk_firmware | — |
-| `files` | files | — (değişmez) |
-| `test_session` | grk_test_session | `test_name`, **`has_iperf_test`**, (`station_name`→`node_name`) |
-| `ping_test` | grk_ping_test | `test_name`, `node_name`, `median_time` |
-| `wifi_analysis` | grk_wifi_analysis | `test_name`, `node_name`, `bssid` |
-| `speed_test` | grk_speed_test | `test_name`, `node_name` (GRK'ya özel) |
-| `iperf_test` | **YENİ** | (tüm tablo; sadece FULL) |
-| `users` | grk_users | — (yalnız ad değişir) |
-
-> **Not:** SQL'deki her kolon senin diyagramından gelir; diyagramda olmayan hiçbir
-> kolon eklenmedi. Tek istisna, senin K8'de açıkça istediğin `has_iperf_test`.
-
-### Gerçek şemadan çıkan farklar (canlı DB çıktısına göre)
-
-- **`median_time` (ping) ve `bssid` (wifi) GRK tablolarında ZATEN VAR** → eklenmez.
-  (`ping_test.median_time numeric(10,3)`, `wifi_analysis.bssid varchar(20)`.)
-- **`test_session`'daki `station_name varchar(50)`** → **`node_name` olarak yeniden
-  adlandırılıyor.** Mevcut setup değerleri otomatik korunur (kolon aynı, sadece adı değişir);
-  ayrı `station_name` kalmaz. GRK kodundaki `station_name` referansları `node_name` olacak.
-- **`iperf_test` sıfırdan kurulmuyor**; `copy_iperf_test` (yapısı zaten doğru) → `iperf_test`
-  olarak **yeniden adlandırılıyor**.
-- Eklenecek kolonlar: `test_name` (test_session, ping_test, wifi_analysis, speed_test) +
-  `node_name` (ping_test, wifi_analysis, speed_test — test_session'ınki station_name'den geliyor) +
-  `has_iperf_test` (test_session).
-- Tipler gerçek şemayla eşitlendi: `test_name varchar(30)`, `node_name varchar(50)`.
+**Hedef:** View'ları sil → `copy_*`'i gerçek birleşik tablolara yükselt → GRK verisini
+taşı → 3 kod tabanını (FULL, grk-test-platform, GRK) yeni tablolara çevir.
 
 ---
 
-## 3. Kararlar (senin cevaplarınla KESİNLEŞTİ)
+## 1. Hedef son durum
 
-| # | Konu | Karar |
-|---|------|-------|
-| K1 | Yaklaşım | **Yeniden adlandırma** (grk_ kalkar). GRK kodunu sen kendi Claude Code'unla güncelleyeceksin (Prompt aşağıda). |
-| K2 | GRK kodunu kim güncelleyecek | Sen — Claude Code prompt'u ile (aşağıda). |
-| K3 | `test_name` | **Varsayılan YOK.** Her INSERT değeri açıkça yazar (GRK→'GRK', FULL→'FULL_SERVIS'). Eski satırlar tek seferlik 'GRK' ile doldurulur. |
-| K4 | GRK'da `node_name` | **NULL değil** → seçilen **setup adı** yazılır (combobox). GRK prompt'unda anlatıldı. Eski GRK satırları NULL kalır. |
-| K5 | `median_time` | ping tablosunda kalır. GRK yazmaz (NULL), FULL yazar. GRK'ya dokunulmaz. |
-| K6 | `bssid` tipi | Teknik detay: `VARCHAR(32)` (MAC adresi sığar), boş olabilir. |
-| K7 | `created_at` | Senin tablolarında zaten var → **dokunulmuyor**, yeni bir şey eklenmiyor. (Yalnız yeni `iperf_test` tablosunda tanımlı.) |
-| K8 | `has_iperf_test` | **test_session'a eklenir** (iperf var mı yok mu görünsün). `iperf_test`'te `session_id` FK olarak var. |
-| K9 | Kolon adları | Senin/takım liderinin verdiği adlar **aynen** korunur (`parallel` vb. değişmez). |
-| K10 | Zamanlama | SQL'i pgAdmin'den **sen** çalıştıracaksın; rename anında GRK yazmıyor olsun yeter. |
-| K11 | `copy_*` silme | Silme SQL'i aşağıda (bölüm C). Doğrulamadan sonra çalıştır. |
-| K12 | Yedek | Güncellemeden **önce** DB içinde `yedek_*` tabloları oluşturulur (bölüm A). |
+- **Gerçek tablolar:** `firmware`, `users`, `test_session`, `ping_test`, `wifi_analysis`,
+  `speed_test`, `iperf_test`.
+- Her sonuç satırında `test_name` ('GRK' / 'FULL_SERVIS') + `node_name` (makine ya da setup).
+- **GRK + FULL** bu tablolara yazar; **grk-test-platform** bunlardan okur.
+- `grk_*` ve `copy_*` en sonda emekli olur.
 
 ---
 
-## 4. Adım adım geçiş (senin sıraladığın düzen)
+## 2. Fazlar (özet)
 
-> Hepsini **sen** yapacaksın: SQL'ler pgAdmin'den, kod güncellemeleri Claude Code prompt'larıyla.
+| Faz | Ne | Nasıl |
+|-----|----|----|
+| 0 | Yedek al | SQL-0 |
+| 1 | `firmware` + `users` gerçek tablo | SQL-1 |
+| 2 | Sonuç tablolarını kur (view sil + copy_ terfi) | SQL-2 |
+| 3 | GRK verisini taşı | SQL-3 |
+| 4 | FULL Servis kodu | Prompt B + sunucu restart |
+| 5 | grk-test-platform kodu | Prompt C + docker rebuild |
+| 6 | **Cutover (sonra):** GRK'yı geçir | Prompt A + FK/delta |
 
-### Faz 0 — Yedekleme (SQL bölüm A)
-- [ ] `yedek_*` tablolarını oluştur (mevcut veriyi kopyalar). → **Bölüm A**
-
-### Faz 1 — Şema güncelleme (SQL bölüm B)
-- [ ] Tabloları yeniden adlandır (`grk_*` → yeni ad, `grk_users`→`users`).
-- [ ] Yeni kolonları ekle (`test_name`, `node_name`, `median_time`, `bssid`, `has_iperf_test`).
-- [ ] Eski satırları `test_name='GRK'` ile doldur.
-- [ ] `iperf_test` tablosunu oluştur. → **Bölüm B**
-
-### Faz 2 — FULL Servis kodu (Prompt B)
-- [ ] Kendi Claude Code'unla FULL Servis kodunu güncelle. → **Prompt B**
-- [ ] FULL Servis sunucusunu yeniden başlat.
-
-### Faz 3 — GRK kodu (Prompt A)
-- [ ] GRK'yı yönettiğin Claude Code'a Prompt A'yı ver. → **Prompt A**
-- [ ] GRK'yı yeniden başlat.
-
-### Faz 4 — Doğrulama
-- [ ] GRK bir test koşar → `test_name='GRK'`, `node_name`=setup adı.
-- [ ] FULL Servis bir test koşar → `test_name='FULL_SERVIS'`, `node_name`=makine, `iperf_test` dolu.
-- [ ] Combobox (marka/model/firmware) çalışıyor; login (`users`) çalışıyor.
-
-### Faz 5 — Temizlik (SQL bölüm C)
-- [ ] Birkaç gün sorunsuz çalıştıktan sonra `copy_*` tablolarını sil. → **Bölüm C**
-- [ ] (İstersen) `yedek_*` tablolarını da sonra sil.
+> **Sıra önemli:** 0→1→2→3 (DB), sonra 4 ve 5 (kod). Faz 6 en son.
+> **Bilinçli not (Faz 5 sonrası, Faz 6 öncesi):** grk-test-platform yeni tabloları
+> okuduğunda GRK'nın geçmişi + FULL verisi görünür; ama GRK **yeni** testleri hâlâ
+> `grk_*`'a yazdığı için Faz 6'ya kadar panelde görünmez. Bu boşluğu Faz 6 kapatır.
 
 ---
 
-## 5. Doğrulama sorguları (Faz 4)
+# 📜 SQL Komutları (Faz 0–3)
+
+> Neden `copy_*` rename? Sıfırdan `CREATE TABLE test_session (... SERIAL ...)` yapsak,
+> Postgres `test_session_session_id_seq` adlı sequence'ı kurmaya çalışır — ama o ad
+> `grk_test_session`'a ait, zaten var → çakışır. `copy_*` rename'i bunu çözer (kendi
+> `copy_..._seq` sequence'ları çakışmaz).
+
+## SQL-0 — Yedek
 
 ```sql
-SELECT test_name, node_name, COUNT(*) FROM ping_test GROUP BY 1,2 ORDER BY 1,2;
-SELECT * FROM test_session ORDER BY session_id DESC LIMIT 5;
-SELECT * FROM iperf_test ORDER BY iperf_id DESC LIMIT 5;
-SELECT node_name, bssid, wifi_protocol FROM wifi_analysis
-  WHERE test_name='FULL_SERVIS' ORDER BY wifi_summary_id DESC LIMIT 5;
-SELECT username FROM users LIMIT 3;   -- rename doğrulama
-```
-
----
-
-## 6. Geri alma (rollback)
-
-- Şema adımında sorun → transaction içinde `ROLLBACK` (bölüm B tek transaction).
-- Sonradan sorun → tabloları eski `grk_*` adlarına geri `RENAME` et; veri `yedek_*`
-  tablolarında zaten duruyor. Son çare: `yedek_*`'ten geri yükle.
-
----
-
-# 📜 SQL Komutları
-
-> pgAdmin'de **sırayla** çalıştır. Kolon tipleri teknik seçimdir; DB'ndeki mevcut
-> tiplerle çelişirse (ör. `avg_time` `NUMERIC` ise) ona göre uyarlarsın.
-
-## Bölüm A — Yedekleme (ÖNCE bunu çalıştır)
-
-```sql
--- Mevcut veriyi aynen kopyalar (yalnız veri; kısıtlar/PK kopyalanmaz — snapshot amaçlı).
 CREATE TABLE yedek_grk_firmware      AS SELECT * FROM grk_firmware;
+CREATE TABLE yedek_grk_users         AS SELECT * FROM grk_users;
 CREATE TABLE yedek_grk_test_session  AS SELECT * FROM grk_test_session;
 CREATE TABLE yedek_grk_ping_test     AS SELECT * FROM grk_ping_test;
 CREATE TABLE yedek_grk_wifi_analysis AS SELECT * FROM grk_wifi_analysis;
 CREATE TABLE yedek_grk_speed_test    AS SELECT * FROM grk_speed_test;
-CREATE TABLE yedek_grk_users         AS SELECT * FROM grk_users;
 ```
+> ✅ **Beklenen:** 6 `yedek_*` tablosu oluştu. Kontrol:
+> ```sql
+> SELECT (SELECT count(*) FROM yedek_grk_test_session)  AS ts,   -- 9 olmalı
+>        (SELECT count(*) FROM yedek_grk_ping_test)      AS ping; -- 16 olmalı
+> ```
 
-## Bölüm B — Şema güncelleme (tek transaction)
+## SQL-1 — firmware + users gerçek tablo (view'ı sil, tablo kur)
+
+```sql
+BEGIN;
+DROP VIEW IF EXISTS firmware;
+DROP VIEW IF EXISTS users;
+
+CREATE TABLE firmware AS SELECT * FROM grk_firmware;
+ALTER TABLE firmware ADD PRIMARY KEY (firmware_id);
+
+CREATE TABLE users AS SELECT * FROM grk_users;
+ALTER TABLE users ADD PRIMARY KEY (user_id);
+COMMIT;
+```
+> ✅ **Beklenen:** `firmware`/`users` artık VIEW değil TABLE. Kontrol:
+> ```sql
+> SELECT relname, relkind FROM pg_class
+> WHERE relname IN ('firmware','users');   -- relkind iki satırda da 'r' (tablo) olmalı
+> SELECT count(*) FROM firmware;           -- 3 olmalı (grk_firmware ile aynı)
+> ```
+> Not: `firmware`/`users`'ı şu an hiçbir kod okumuyor; Faz 6'da (cutover) asıl olacaklar.
+
+## SQL-2 — Sonuç tablolarını kur (view'ları sil + copy_ terfi)
+
+```sql
+BEGIN;
+-- grk-test-platform'un okuduğu view'ları kaldır (yerine gerçek tablo gelecek)
+DROP VIEW IF EXISTS test_session;
+DROP VIEW IF EXISTS ping_test;
+DROP VIEW IF EXISTS wifi_analysis;
+DROP VIEW IF EXISTS speed_test;
+
+-- copy_ staging tablolarını final adlara yükselt (yapıları hazır, sequence'ları çakışmaz)
+ALTER TABLE copy_test_session  RENAME TO test_session;
+ALTER TABLE copy_ping_test     RENAME TO ping_test;
+ALTER TABLE copy_wifi_analysis RENAME TO wifi_analysis;
+ALTER TABLE copy_speed_test    RENAME TO speed_test;
+ALTER TABLE copy_iperf_test    RENAME TO iperf_test;
+
+-- test_session'a eksik iki kolon (node_name = setup/makine, has_iperf_test)
+ALTER TABLE test_session ADD COLUMN IF NOT EXISTS node_name      VARCHAR(50);
+ALTER TABLE test_session ADD COLUMN IF NOT EXISTS has_iperf_test BOOLEAN DEFAULT FALSE;
+COMMIT;
+```
+> ✅ **Beklenen:** 5 ad artık gerçek TABLE. Kontrol:
+> ```sql
+> SELECT relname, relkind FROM pg_class
+> WHERE relname IN ('test_session','ping_test','wifi_analysis','speed_test','iperf_test')
+> ORDER BY relname;   -- hepsi relkind='r'
+> -- şu an sadece FULL staging verisi var:
+> SELECT count(*) FROM test_session;   -- 13    (copy_test_session'dan geldi)
+> SELECT count(*) FROM ping_test;      -- 83
+> SELECT count(*) FROM iperf_test;     -- 10
+> ```
+
+## SQL-3 — GRK verisini taşı (FULL staging SİLİNMEZ; GRK satırları yeni id alır)
 
 ```sql
 BEGIN;
 
--- 1) Tablo adlarından grk_ önekini kaldır (files ve firmware ilişkisi otomatik korunur)
-ALTER TABLE IF EXISTS grk_firmware      RENAME TO firmware;
-ALTER TABLE IF EXISTS grk_test_session  RENAME TO test_session;
-ALTER TABLE IF EXISTS grk_ping_test     RENAME TO ping_test;
-ALTER TABLE IF EXISTS grk_wifi_analysis RENAME TO wifi_analysis;
-ALTER TABLE IF EXISTS grk_speed_test    RENAME TO speed_test;
-ALTER TABLE IF EXISTS grk_users         RENAME TO users;
+-- GRK satırlarını YENİ id ile ekliyoruz (FULL staging'e dokunmadan). Çocuk tabloların
+-- bağı için geçici eşleme kolonu: _old_session_id = kaydın eski grk session_id'si.
+ALTER TABLE test_session ADD COLUMN _old_session_id INTEGER;
 
--- 2) test_session: station_name -> node_name (mevcut setup verisi korunur) +
---    test_name (default YOK) + has_iperf_test
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns
-             WHERE table_name = 'test_session' AND column_name = 'station_name') THEN
-    ALTER TABLE test_session RENAME COLUMN station_name TO node_name;
-  END IF;
-END $$;
-ALTER TABLE test_session ADD COLUMN IF NOT EXISTS test_name      VARCHAR(30);
-ALTER TABLE test_session ADD COLUMN IF NOT EXISTS has_iperf_test BOOLEAN DEFAULT FALSE;
-UPDATE test_session SET test_name = 'GRK' WHERE test_name IS NULL;
+-- 1) GRK oturumları → test_session (session_id OTOMATİK yeni; station_name → node_name)
+INSERT INTO test_session
+    (_old_session_id, firmware_id, test_name, node_name, session_start_time, session_end_time,
+     test_duration, has_ping_test, has_speedtest, has_wifi_analysis, has_iperf_test,
+     ftp_file_path, error_log_ftp_path, created_at)
+SELECT session_id, firmware_id, 'GRK', station_name, session_start_time, session_end_time,
+       test_duration, has_ping_test, has_speedtest, has_wifi_analysis, FALSE,
+       ftp_file_path, error_log_ftp_path, created_at
+FROM grk_test_session;
 
--- 3) ping_test: test_name + node_name  (median_time ZATEN VAR → eklenmez)
-ALTER TABLE ping_test ADD COLUMN IF NOT EXISTS test_name VARCHAR(30);
-ALTER TABLE ping_test ADD COLUMN IF NOT EXISTS node_name VARCHAR(50);
-UPDATE ping_test SET test_name = 'GRK' WHERE test_name IS NULL;
+-- 2) GRK ping → ping_test (node_name = setup = ts.node_name)
+INSERT INTO ping_test
+    (session_id, test_name, node_name, target_ip, ip_version, total_pings,
+     successful_pings, failed_pings, success_rate, packet_loss_percent,
+     min_time, max_time, avg_time, median_time, std_dev_time,
+     ftp_file_path, test_start_time, test_end_time, created_at)
+SELECT ts.session_id, 'GRK', ts.node_name, p.target_ip, p.ip_version, p.total_pings,
+       p.successful_pings, p.failed_pings, p.success_rate, p.packet_loss_percent,
+       p.min_time, p.max_time, p.avg_time, p.median_time, p.std_dev_time,
+       p.ftp_file_path, p.test_start_time, p.test_end_time, p.created_at
+FROM grk_ping_test p
+JOIN test_session ts ON ts._old_session_id = p.session_id;
 
--- 4) wifi_analysis: test_name + node_name  (bssid ZATEN VAR → eklenmez)
-ALTER TABLE wifi_analysis ADD COLUMN IF NOT EXISTS test_name VARCHAR(30);
-ALTER TABLE wifi_analysis ADD COLUMN IF NOT EXISTS node_name VARCHAR(50);
-UPDATE wifi_analysis SET test_name = 'GRK' WHERE test_name IS NULL;
+-- 3) GRK wifi → wifi_analysis
+INSERT INTO wifi_analysis
+    (session_id, test_name, node_name, total_samples, disconnected_count, connected_count,
+     channel, wifi_protocol, bssid, avg_signal_percentage, min_signal_percentage,
+     max_signal_percentage, avg_rx_rate, avg_tx_rate, avg_cpu_usage, avg_ram_usage,
+     ftp_file_path, test_start_time, test_end_time, created_at)
+SELECT ts.session_id, 'GRK', ts.node_name, w.total_samples, w.disconnected_count, w.connected_count,
+       w.channel, w.wifi_protocol, w.bssid, w.avg_signal_percentage, w.min_signal_percentage,
+       w.max_signal_percentage, w.avg_rx_rate, w.avg_tx_rate, w.avg_cpu_usage, w.avg_ram_usage,
+       w.ftp_file_path, w.test_start_time, w.test_end_time, w.created_at
+FROM grk_wifi_analysis w
+JOIN test_session ts ON ts._old_session_id = w.session_id;
 
--- 5) speed_test: test_name + node_name (GRK'ya özel; FULL yazmaz)
-ALTER TABLE speed_test ADD COLUMN IF NOT EXISTS test_name VARCHAR(30);
-ALTER TABLE speed_test ADD COLUMN IF NOT EXISTS node_name VARCHAR(50);
-UPDATE speed_test SET test_name = 'GRK' WHERE test_name IS NULL;
+-- 4) GRK speed → speed_test
+INSERT INTO speed_test
+    (session_id, test_name, node_name, total_measurements, avg_download_mbps, avg_upload_mbps,
+     min_download_mbps, max_download_mbps, min_upload_mbps, max_upload_mbps,
+     latency, jitter, server_name, ftp_file_path, created_at)
+SELECT ts.session_id, 'GRK', ts.node_name, sp.total_measurements, sp.avg_download_mbps, sp.avg_upload_mbps,
+       sp.min_download_mbps, sp.max_download_mbps, sp.min_upload_mbps, sp.max_upload_mbps,
+       sp.latency, sp.jitter, sp.server_name, sp.ftp_file_path, sp.created_at
+FROM grk_speed_test sp
+JOIN test_session ts ON ts._old_session_id = sp.session_id;
 
--- 6) iperf_test: copy_iperf_test'i yeniden adlandır (yapısı zaten FULL koduyla birebir)
-ALTER TABLE IF EXISTS copy_iperf_test RENAME TO iperf_test;
---   (İsteğe bağlı) staging sırasında birikmiş test satırlarını temizle:
--- TRUNCATE iperf_test;
---   (İsteğe bağlı) session_id için foreign key ekle:
--- ALTER TABLE iperf_test
---   ADD CONSTRAINT iperf_test_session_fk
---   FOREIGN KEY (session_id) REFERENCES test_session(session_id);
+-- 5) Geçici eşleme kolonunu kaldır
+ALTER TABLE test_session DROP COLUMN _old_session_id;
 
 COMMIT;
 ```
-
-> Sorun görürsen `COMMIT;` yerine `ROLLBACK;` yaz → hiçbir değişiklik kalıcı olmaz.
-
-## Bölüm C — Temizlik (Faz 4 doğrulamasından SONRA)
-
-```sql
--- FULL Servis artık ortak tablolara yazdığı için kalan copy_ tabloları gereksiz.
--- DİKKAT: copy_iperf_test YOK — o "iperf_test" olarak yeniden adlandırıldı (Bölüm B/6).
-DROP TABLE IF EXISTS copy_ping_test;
-DROP TABLE IF EXISTS copy_wifi_analysis;
-DROP TABLE IF EXISTS copy_speed_test;
-DROP TABLE IF EXISTS copy_test_session;
--- İstersen yedekleri de sonra sil:
--- DROP TABLE IF EXISTS yedek_grk_firmware, yedek_grk_test_session, yedek_grk_ping_test,
---                      yedek_grk_wifi_analysis, yedek_grk_speed_test, yedek_grk_users;
-```
+> ✅ **Beklenen:** GRK verisi kopyalandı, FULL verisi durmakta. Kontrol:
+> ```sql
+> SELECT test_name, count(*) FROM test_session GROUP BY 1 ORDER BY 1;
+> --  GRK        9
+> --  FULL_SERVIS 13
+> SELECT (SELECT count(*) FROM grk_ping_test) AS grk,
+>        (SELECT count(*) FROM ping_test WHERE test_name='GRK') AS yeni;  -- 16 = 16
+> SELECT DISTINCT node_name FROM ping_test WHERE test_name='GRK';  -- GRK setup adları
+> ```
+> `iperf_test`'e GRK verisi eklenmez (GRK'da iperf yok); FULL testleriyle dolar.
+> Sorun görürsen `COMMIT` yerine `ROLLBACK`.
 
 ---
 
-# 🤖 Prompt'lar (kod güncellemeleri için)
+# 🤖 Prompt'lar
 
-> Bunları ilgili Claude Code oturumuna **olduğu gibi** yapıştır.
-
-## Prompt A — GRK kodunu güncelle (GRK'yı yönettiğin makinede)
+## Prompt B — FULL Servis kodu (Faz 4, ŞİMDİ)
 
 ```text
-cpeqadb veritabanında tablo adları değişti (grk_ öneki kaldırıldı) ve yeni kolonlar eklendi.
-Aşağıdaki değişiklikleri GRK kod tabanına uygula, davranışı başka türlü değiştirme:
+DB'de ortak sonuç tabloları kuruldu (copy_ staging tabloları final adlara yükseltildi).
+FULL Servis artık bunlara yazacak. Şu değişiklikleri yap, başka bir şeyi değiştirme:
 
-1) Tüm SQL referanslarında tablo adlarını güncelle:
-   grk_firmware      -> firmware
-   grk_test_session  -> test_session
-   grk_ping_test     -> ping_test
-   grk_wifi_analysis -> wifi_analysis
-   grk_speed_test    -> speed_test
-   grk_users         -> users
-
-2) Sonuç yazan tüm INSERT'lere test_name = 'GRK' ekle (test_session, ping_test,
-   wifi_analysis, speed_test). Bu kolonun DEFAULT'u YOK; her zaman açıkça yazılmalı.
-
-3) node_name: test_session'daki "station_name" kolonu "node_name" olarak yeniden
-   adlandırıldı. GRK kodunda geçen TÜM "station_name" referanslarını "node_name" yap.
-   Ayrıca kullanıcının seçtiği SETUP adını (ör. "GRK-1 - 2.4 GHz") ping_test,
-   wifi_analysis, speed_test sonuç INSERT'lerine de node_name olarak yaz. (Bu değer zaten
-   SessionInitRequest.server / setup seçiminde mevcut; onu kullan.)
-
-4) test_session INSERT'inde has_iperf_test alanını FALSE ver (GRK'da iperf yok) ya da hiç
-   yazma (kolonun default'u FALSE).
-
-5) median_time (ping) ve bssid (wifi) kolonları tabloda ZATEN VAR ama GRK hesaplamıyor;
-   bunları YAZMA (NULL kalsınlar). Şema değişikliği gerektirmez.
-
-6) Login/kullanıcı sorguları artık "users" tablosunu kullanmalı (eski grk_users).
-
-Not: Sadece tablo adları + yukarıdaki kolonlar değişiyor; iş mantığını, testleri ve
-diğer davranışları aynen koru.
-```
-
-## Prompt B — FULL Servis kodunu güncelle (bu repo)
-
-```text
-DB birleştirmesi yapıldı: copy_ staging tabloları yerine ortak tablolara yazacağız ve
-grk_ önekli tablolar yeniden adlandırıldı. Şu değişiklikleri uygula:
-
-1) fullservice-backend/server/db_service.py — en üstteki tablo adı sabitlerini güncelle:
+fullservice-backend/server/db_service.py — en üstteki tablo adı sabitleri:
    T_SESSION = "test_session"
    T_PING    = "ping_test"
    T_SPEED   = "speed_test"
    T_WIFI    = "wifi_analysis"
    T_IPERF   = "iperf_test"
-   T_FIRMWARE = "firmware"
+   (T_FIRMWARE şimdilik "grk_firmware" kalsın — firmware/users cutover'da bağlanacak.)
 
-2) fullservice-backend/common/firmware_db.py — get_brands/get_models/get_versions
-   sorgularında "grk_firmware" -> "firmware".
+create_session'a has_iperf desteği ekle:
+ - create_session(...) imzasına has_iperf parametresi + test_session INSERT'ine
+   has_iperf_test kolonu.
+ - orchestrator: oturumda iperf rolü varsa create_session'a has_iperf=True geçsin.
 
-3) fullservice-backend/server/auth_service.py — "grk_users" -> "users".
+firmware_db.py ve auth_service.py'ye DOKUNMA (grk_firmware/grk_users canlı okunuyor).
+test_name zaten 'FULL_SERVIS', node_name zaten makine adı — değiştirme.
+```
+> ✅ **Beklenen (Faz 4):** Sunucu restart sonrası bir FULL testi koş → `test_session`'a
+> `test_name='FULL_SERVIS'` yeni satır; `iperf_test`'e satır düşer.
 
-4) has_iperf_test desteği ekle:
-   - db_service.create_session(...) imzasına has_iperf parametresi ekle ve
-     test_session INSERT'ine has_iperf_test kolonunu ekle.
-   - orchestrator, oturumda iperf rolü varsa create_session'a has_iperf=True geçsin
-     (has_ping/has_wifi ile aynı mantık).
+## Prompt C — grk-test-platform kodu (Faz 5, ŞİMDİ)
 
-5) test_name zaten 'FULL_SERVIS', node_name zaten makine adı (log_name) olarak
-   yazılıyor — bunları değiştirme.
+```text
+grk-test-platform artık cpeqadb'deki YENİ birleşik tablolardan okuyacak (aynı adlar:
+test_session/ping_test/wifi_analysis/speed_test — artık view değil gerçek tablo).
+Tablolar GRK + FULL verisini birlikte tutuyor; ayırt edici kolon test_name
+('GRK'/'FULL_SERVIS'), makine/setup ise node_name. Sadece OKUMA; yazma yok.
 
-Sadece bu değişiklikler; başka davranış değişmesin. Sırlar/certs mantığına dokunma.
+1) Entity kolonları (backend/app/entities/):
+   - test_session.py: station_name -> node_name DEĞİŞTİR; ayrıca ekle:
+       test_name = Column(String(30)); has_iperf_test = Column(Boolean)
+   - ping_test.py:      ekle: test_name, node_name
+   - wifi_analysis.py:  ekle: test_name, node_name
+   - speed_test.py:     ekle: test_name, node_name
+   (__tablename__ AYNI kalıyor.)
+
+2) İlgili DTO'ları (backend/app/dtos/) yeni alanları döndürecek şekilde güncelle
+   (test_name, node_name, has_iperf_test).
+
+3) YENİ test tipi: iperf. entity (iperf_test.py, __tablename__="iperf_test"), DTO ve
+   results_controller'a GET /iperf-results ucu ekle (diğerleriyle aynı desen).
+   Kolonlar: iperf_id (PK), session_id, test_name, node_name, server_node_name,
+   server_ip, port, parallel, duration, sender_mbps, receiver_mbps, ftp_file_path,
+   test_start_time, test_end_time, created_at.
+
+4) grk_router_log tarafına DOKUNMA (grk_router_logs okumaya devam).
+
+Sonra Docker image'ini yeniden kur ve sunucuda yeni image ile ayağa kaldır.
+```
+> ✅ **Beklenen (Faz 5):** Docker yeniden kalkınca panel yeni tablolardan okur;
+> listede `test_name`/`node_name` kolonları görünür; GRK geçmişi + FULL verisi listelenir;
+> iperf sekmesi/uç çalışır. Hata alırsan (ör. eksik kolon) bana yaz.
+
+## Prompt A — GRK kodu (Faz 6, CUTOVER — SONRA)
+
+```text
+GRK'yı ortak tablolara geçir (firmware, users, test_session, ping_test, wifi_analysis,
+speed_test). Davranışı başka türlü değiştirme:
+
+1) Tablo adlarını güncelle: grk_firmware->firmware, grk_test_session->test_session,
+   grk_ping_test->ping_test, grk_wifi_analysis->wifi_analysis, grk_speed_test->speed_test,
+   grk_users->users.
+2) Sonuç yazan tüm INSERT'lere test_name = 'GRK' ekle (default yok, hep açık yaz).
+3) "station_name" olarak yazdığın setup değerini artık "node_name" kolonuna yaz
+   (test_session.node_name ve ping/wifi/speed sonuç satırlarındaki node_name).
+4) test_session INSERT'inde has_iperf_test = FALSE (GRK'da iperf yok) ya da hiç yazma.
+5) median_time (ping) ve bssid (wifi) kolonlarını GRK hesaplamıyorsa NULL bırak.
+6) Login artık "users" tablosundan.
+
+Not: Sadece tablo/kolon adları değişir; iş mantığını ve testleri koru.
 ```
 
 ---
 
-> **Sıradaki adım:** Bölüm A'yı (yedek) çalıştır, sonra Bölüm B (şema). Ardından Prompt B
-> ile FULL Servis'i, Prompt A ile GRK'yı güncelle. Doğrulama geçince Bölüm C ile temizle.
+## 3. Faz 6 — Cutover detayları (şimdi değil, en son)
+
+Staging (Faz 0–5) doğrulanınca GRK'yı da geçirirken:
+
+1. **GRK kodu:** Prompt A ile geçir, GRK'yı yeniden başlat.
+2. **FULL Servis:** `db_service.py` `T_FIRMWARE="firmware"`; `firmware_db.py`
+   `grk_firmware->firmware`; `auth_service.py` `grk_users->users`.
+3. **FK:** `test_session.firmware_id` FK'sini `grk_firmware`'den `firmware`'e taşı.
+4. **Interim delta:** GRK, staging boyunca `grk_*`'a yazdı. Kopyalama sonrası eklenen
+   GRK kayıtlarını (`WHERE created_at > <SQL-3 zamanı>`) yeni tablolara aktar
+   (SQL-3'teki eşleme yöntemiyle, yeni id vererek).
+5. Her şey oturunca `grk_*`, `copy_*` (kalan) ve `yedek_*` arşivlenir/silinir.
+
+> Faz 6'yı ayrı bir oturumda, hazır olduğunda yaparız — o zaman bu bölümü SQL'lerle
+> detaylandırırım.
+```

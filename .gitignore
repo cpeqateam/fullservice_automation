@@ -24,4 +24,7 @@ secrets.json
 # GRK referans projesi — yalnızca yerel örnek, repoya gitmez
 grk-automation/
 
+# grk-test-platform — AYRI repo + sırlar (certs, .env) içerir; repoya ASLA gitmez
+grk-test-platform/
+
 image.png
