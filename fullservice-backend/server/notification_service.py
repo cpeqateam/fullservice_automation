@@ -91,6 +91,8 @@ def send_completion(device: dict, session_id: str, start_time):
 
 
 def _worker(device: dict, session_id: str, start_time):
+    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) oturumun log dosyalarını
+    toplar, tamamlanma metnini kurup mail (metin) + Telegram (metin + loglar) gönderir."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
     end_time = datetime.now()
@@ -107,6 +109,7 @@ def _worker(device: dict, session_id: str, start_time):
 
 
 def _send_email(body: str):
+    """Tamamlanma metnini TO/CC adreslerine mail olarak gönderir (yalnızca metin, ek YOK)."""
     try:
         from server.email_sender import EmailSender
         sender = EmailSender()
@@ -121,6 +124,8 @@ def _send_email(body: str):
 
 
 def _send_telegram(body: str, logs: List[str]):
+    """Tamamlanma metnini Telegram grubuna, ardından özet log dosyalarını gönderir
+    (50 MB üstü dosyalar gönderilmez, yerine uyarı mesajı atılır)."""
     try:
         notify.send_telegram(body)
         for path in (logs or []):

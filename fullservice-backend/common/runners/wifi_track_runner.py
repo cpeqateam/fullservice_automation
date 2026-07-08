@@ -86,6 +86,7 @@ def _aggregate(samples: list, start_iso: str, end_iso: str) -> dict:
     total = len(samples)
 
     def _avg(xs):
+        """Boş olmayan listenin 2 ondalıklı ortalamasını, boşsa None döner."""
         return round(statistics.mean(xs), 2) if xs else None
 
     return {
@@ -108,6 +109,9 @@ def _aggregate(samples: list, start_iso: str, end_iso: str) -> dict:
 
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
+    """Wi-Fi izleme testini çalıştırır: süre boyunca (gerçek saniye) her örnekte GRK ölçüm
+    fonksiyonlarıyla sinyal/kanal/RX-TX/sistem verisini okuyup GRK satır formatında log'a yazar,
+    örnekleri toplayıp DB özeti (ctx.result) üretir. Üretilen log dosyası yollarını döner."""
     duration = max(1, int(params.duration))
     # GRK ile aynı standart: FULL_Service_wifiAnaliz_<brand>_<model>_<fw>_<sn>sn_<ts>.txt
     log_file = ctx.grk_log_path("wifiAnaliz", params.brand, params.model, params.firmware,
@@ -135,6 +139,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     samples: list = []   # (signal, system) — DB özeti için biriktirilir
 
     def _emit():
+        """Toplanan örneklerden wifi özetini hesaplayıp ctx.result ile (DB'ye) bildirir."""
         if ctx.result:
             end_iso = datetime.now().isoformat(timespec="seconds")
             ctx.result("wifi", _aggregate(samples, start_iso, end_iso))

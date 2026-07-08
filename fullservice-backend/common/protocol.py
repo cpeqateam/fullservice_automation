@@ -37,6 +37,7 @@ TEST_LABELS: Dict[str, str] = {
 
 
 class TestStatus(str, Enum):
+    """Bir testin yaşam döngüsü durumları (idle/running/completed/error/stopped)."""
     IDLE = "idle"
     RUNNING = "running"
     COMPLETED = "completed"

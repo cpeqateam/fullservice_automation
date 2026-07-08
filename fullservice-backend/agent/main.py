@@ -54,6 +54,7 @@ app = FastAPI(title=f"FULL Servis Agent [{NODE_ID}]", version="0.1.0")
 
 @app.get("/health")
 def health():
+    """Sağlık kontrolü — agent ayakta mı, hangi node_id (health-check bunu yoklar)."""
     return {"status": "ok", "node_id": NODE_ID}
 
 
@@ -98,6 +99,7 @@ def _register_loop():
 
 @app.on_event("startup")
 def _on_startup():
+    """Agent açılışında sunucuya kayıt + heartbeat döngüsünü arka planda başlatır."""
     threading.Thread(target=_register_loop, daemon=True).start()
 
 

@@ -66,6 +66,8 @@ def finalize_async(device: dict, session_id: str, start_time, start_offset: int)
 
 
 def _worker(device: dict, session_id: str, start_time, start_offset: int):
+    """Arka plan iş parçacığı: app.log'un bu oturuma ait dilimini `FULL_Service_errorlog_...`
+    dosyasına yazıp FTP'deki Errorlog klasörüne yükler (bildirim göndermez)."""
     brand    = device.get("brand") or "Unknown"
     model    = device.get("model") or "Unknown"
     firmware = device.get("firmware") or "Unknown"

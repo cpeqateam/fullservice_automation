@@ -21,6 +21,7 @@ except (TypeError, ValueError):
 
 
 def send_telegram(text: str):
+    """Telegram grubuna (CHAT_ID) HTML formatlı metin mesajı gönderir."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHAT_ID,
@@ -33,6 +34,7 @@ def send_telegram(text: str):
 
 
 def send_document(document_path: str, caption: str = None):
+    """Bir dosyayı (özet log vb.) isteğe bağlı başlıkla Telegram grubuna yükler."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
     data = {"chat_id": CHAT_ID}
     if caption:

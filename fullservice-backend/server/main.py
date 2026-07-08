@@ -43,17 +43,24 @@ from common import firmware_db
 # ── app.log Tee: tüm print/stderr çıktısını logs/app.log'a da yaz ──────────────
 # error_log (log_capture) test aralığını byte-offset ile bu dosyadan dilimler.
 class _Tee:
+    """stdout/stderr'i hem konsola hem de logs/app.log'a aynalayan sarmalayıcı
+    (error_log, testin app.log dilimini byte-offset ile bu dosyadan alır)."""
+
     def __init__(self, stream, fh):
+        """Asıl akışı (stream) ve app.log dosya tanıtıcısını (fh) sarar."""
         self._stream, self._fh = stream, fh
     def write(self, data):
+        """Veriyi hem asıl akışa hem app.log'a yazar (hatayı yutar)."""
         try: self._stream.write(data)
         except Exception: pass
         try: self._fh.write(data); self._fh.flush()
         except Exception: pass
     def flush(self):
+        """Asıl akışı boşaltır."""
         try: self._stream.flush()
         except Exception: pass
     def __getattr__(self, name):
+        """Sarmalanmayan öznitelikleri asıl akışa devreder."""
         return getattr(self._stream, name)
 
 try:
@@ -97,10 +104,12 @@ class SessionStartRequest(BaseModel):
 
 @app.get("/health")
 def health():
+    """Sunucu ayakta mı — basit sağlık kontrolü."""
     return {"status": "ok"}
 
 
 class LoginRequest(BaseModel):
+    """Login isteği gövdesi: kullanıcı adı + şifre."""
     username: str
     password: str
 
@@ -117,12 +126,14 @@ def login(req: LoginRequest):
 
 @app.post("/api/register")
 def register(req: RegisterRequest):
+    """Agent kaydı/heartbeat — düğümü online işaretler."""
     orch.register(req.dict() if hasattr(req, "dict") else req.model_dump())
     return {"status": "registered", "node_id": req.node_id}
 
 
 @app.post("/api/progress")
 def progress(upd: ProgressUpdate):
+    """Agent'tan gelen anlık test ilerlemesini orchestrator'a iletir."""
     orch.update_progress(upd.node_id, upd.task, upd.progress, upd.status, upd.message)
     return {"status": "ok"}
 
@@ -136,6 +147,7 @@ def result_report(rep: ResultReport):
 
 @app.post("/api/logs/upload")
 def upload_log(node_id: str = Form(...), session_id: str = Form(...), file: UploadFile = File(...)):
+    """Agent'ın yüklediği log dosyasını logs/ altına yazar ve arka planda FTP'ye iletir."""
     dest = log_collector.save_upload(node_id, session_id, file.filename, file.file)
     # Sunucuya inen log'u doğru FTP klasör yapısına (arka planda) yükle
     orch.upload_log_to_ftp(node_id, dest)
@@ -144,11 +156,13 @@ def upload_log(node_id: str = Form(...), session_id: str = Form(...), file: Uplo
 
 @app.get("/api/state")
 def state():
+    """Dashboard'ın 1 sn'de bir çektiği birleşik durum (düğümler + oturum + ilerleme)."""
     return orch.get_state()
 
 
 @app.post("/api/session/start")
 def session_start(req: SessionStartRequest):
+    """FULL Servis testini başlatır — override'ları alıp tüm düğümlere fan-out eder."""
     overrides = req.dict() if hasattr(req, "dict") else req.model_dump()
     overrides = {k: v for k, v in overrides.items() if v is not None}
     result = orch.start_session(overrides)
@@ -157,6 +171,7 @@ def session_start(req: SessionStartRequest):
 
 @app.post("/api/session/stop")
 def session_stop():
+    """Çalışan testleri durdurur (durdurma bildirimi tetiklemez)."""
     return orch.stop_session()
 
 
@@ -177,6 +192,7 @@ def health_check():
 # DB erişilemezse 503 döner; frontend bunu serbest-metin girişine düşmek için kullanır.
 @app.get("/api/firmware/brands")
 def firmware_brands():
+    """Marka listesi (DB'den). DB yoksa 503 → frontend serbest-metne düşer."""
     try:
         return firmware_db.get_brands()
     except Exception as e:
@@ -185,6 +201,7 @@ def firmware_brands():
 
 @app.get("/api/firmware/models/{brand}")
 def firmware_models(brand: str):
+    """Markaya ait model listesi (DB'den). DB yoksa 503."""
     try:
         return firmware_db.get_models(brand)
     except Exception as e:
@@ -193,6 +210,7 @@ def firmware_models(brand: str):
 
 @app.get("/api/firmware/versions/{brand}/{model}")
 def firmware_versions(brand: str, model: str):
+    """Marka+modele ait firmware sürüm listesi (DB'den). DB yoksa 503."""
     try:
         return firmware_db.get_versions(brand, model)
     except Exception as e:
@@ -207,6 +225,7 @@ if os.path.isdir(DASHBOARD_DIR):
 else:
     @app.get("/")
     def _no_dashboard():
+        """dist/ derlenmemişse "/" için 404 döner (geliştirmede Vite ayrı portta çalışır)."""
         return JSONResponse({"detail": f"dashboard/ bulunamadi: {DASHBOARD_DIR}"}, status_code=404)
 
 

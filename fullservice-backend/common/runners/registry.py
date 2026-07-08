@@ -31,4 +31,5 @@ RUNNERS: Dict[str, RunnerFn] = {
 
 
 def get_runner(test_type: str) -> RunnerFn | None:
+    """Test tipi adına karşılık gelen runner fonksiyonunu döner; yoksa None."""
     return RUNNERS.get(test_type)

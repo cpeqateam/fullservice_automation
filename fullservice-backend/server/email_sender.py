@@ -17,7 +17,11 @@ from common.config import get_secret
 
 
 class EmailSender:
+    """Gmail SMTP ile e-posta gönderen zincirlenebilir yardımcı (konu/gövde/alıcı/ek ayarla,
+    tek `send_email()` ile gönder). SMTP kimliği get_secret ile secrets.json/env'den gelir."""
+
     def __init__(self):
+        """SMTP ayarlarını (Gmail, 587) ve sırları (get_secret) yükler, boş içerik alanlarını kurar."""
         self.smtp_server = 'smtp.gmail.com'
         self.smtp_port = 587
         # Sırlar repoya KONMAZ — ortam değişkeni ya da gitignore'lu secrets.json'dan gelir.
@@ -32,14 +36,17 @@ class EmailSender:
         self.attachments = []
 
     def set_body(self, body):
+        """Mail gövdesini ayarlar (zincirleme için self döner)."""
         self.body = str(body)
         return self
 
     def set_subject(self, subject):
+        """Mail konusunu ayarlar (zincirleme için self döner)."""
         self.subject = str(subject)
         return self
 
     def add_to_address(self, address):
+        """Alıcı (To) adresi ekler — str ya da liste kabul eder; tekrarları atlar."""
         if isinstance(address, str):
             if address not in self.to_addresses:
                 self.to_addresses.append(address)
@@ -49,6 +56,7 @@ class EmailSender:
         return self
 
     def add_cc_address(self, address):
+        """Kopya (CC) adresi ekler — str ya da liste kabul eder; tekrarları atlar."""
         if isinstance(address, str):
             if address not in self.cc_addresses:
                 self.cc_addresses.append(address)
@@ -58,6 +66,7 @@ class EmailSender:
         return self
 
     def add_attachment(self, file_path):
+        """Dosya eki ekler (yoksa FileNotFoundError). FULL Servis bildirim mailinde ek YOK."""
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Belirtilen dosya bulunamadı: {file_path}")
         if file_path not in self.attachments:
@@ -65,6 +74,8 @@ class EmailSender:
         return self
 
     def send_email(self):
+        """Hazırlanan maili gönderir (starttls + login + sendmail); konu `[ROBOT] ...`,
+        gövde HTML. Zorunlu alanlar boşsa ValueError."""
         if not self.body.strip():
             raise ValueError("Mesaj içeriği boş olamaz!")
         if not self.subject.strip():

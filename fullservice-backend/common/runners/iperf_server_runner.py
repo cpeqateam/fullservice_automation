@@ -20,6 +20,8 @@ from common.runners.base import RunContext, NO_WINDOW, open_log_viewer, close_te
 
 
 def run(params, ctx: RunContext) -> list[str]:
+    """`iperf3 -s` sunucusunu (kablolu Mac) dinlemeye alır; client bağlanabilsin diye
+    test süresinden biraz uzun ayakta tutar. Üretilen log dosyası yollarını döner."""
     # GRK ile aynı standart: FULL_Service_iperf_server_<brand>_<model>_<fw>_<port>_<ts>.txt
     log_file = ctx.grk_log_path("iperf_server", params.brand, params.model, params.firmware,
                                 str(params.iperf_port))

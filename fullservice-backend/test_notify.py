@@ -37,6 +37,8 @@ def _mask(v: str) -> str:
 
 
 def check_secrets() -> bool:
+    """Gerekli 5 sır anahtarı (env ya da secrets.json) tanımlı mı diye maskeleyerek listeler;
+    hepsi doluysa True döner."""
     print("=== 1) secrets kontrolu (env -> secrets.json) ===")
     keys = ["FS_TELEGRAM_BOT_TOKEN", "FS_TELEGRAM_CHAT_ID",
             "FS_SMTP_USER", "FS_SMTP_PASS", "FS_SMTP_FROM"]
@@ -53,6 +55,7 @@ def check_secrets() -> bool:
 
 
 def test_telegram() -> bool:
+    """Telegram token'ını (getMe) doğrular, sonra gruba [TEST] mesajı + örnek dosya gönderir."""
     print("=== 2) Telegram testi ===")
     token = get_secret("FS_TELEGRAM_BOT_TOKEN")
     chat = get_secret("FS_TELEGRAM_CHAT_ID", "0")
@@ -95,6 +98,7 @@ def test_telegram() -> bool:
 
 
 def test_mail(extra_to: str = None) -> bool:
+    """[TEST] mailini kendine (FS_SMTP_FROM) — ve verilirse extra_to'ya — gönderir."""
     print("=== 3) Mail testi ===")
     from_addr = get_secret("FS_SMTP_FROM", "cpetestteam@gmail.com")
     if not get_secret("FS_SMTP_PASS"):

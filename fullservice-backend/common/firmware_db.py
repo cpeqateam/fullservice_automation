@@ -105,6 +105,7 @@ def _query(sql: str, params: dict | None = None) -> list:
 
 
 def get_brands() -> list[str]:
+    """DB'deki tüm markaları (distinct, alfabetik) döner — Marka combobox'unu besler."""
     return _query(
         "SELECT DISTINCT brand FROM firmware "
         "WHERE brand IS NOT NULL ORDER BY brand"
@@ -112,6 +113,7 @@ def get_brands() -> list[str]:
 
 
 def get_models(brand: str) -> list[str]:
+    """Verilen markaya ait modelleri (distinct, alfabetik) döner."""
     return _query(
         "SELECT DISTINCT model FROM firmware "
         "WHERE brand = :b AND model IS NOT NULL ORDER BY model",
@@ -120,6 +122,7 @@ def get_models(brand: str) -> list[str]:
 
 
 def get_versions(brand: str, model: str) -> list[str]:
+    """Verilen marka+modele ait firmware sürümlerini (distinct, alfabetik) döner."""
     return _query(
         "SELECT DISTINCT firmware_version FROM firmware "
         "WHERE brand = :b AND model = :m AND firmware_version IS NOT NULL "

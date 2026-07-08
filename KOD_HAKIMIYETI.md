@@ -2,7 +2,7 @@
 
 Bu doküman, projedeki **Python** kodunu açar.
 
-> Mevcut durum + sıradaki adımlar için: [`GELISTIRME_GUNLUGU.md`](GELISTIRME_GUNLUGU.md).
+> Mevcut durum + sıradaki adımlar için: [`CHANGELOG.md`](CHANGELOG.md).
 > Bu dosya **kodu okuma** rehberidir. Kurulum için: `fullservice-backend/KURULUM_SAHA_4_MAKINE.md`.
 
 ---

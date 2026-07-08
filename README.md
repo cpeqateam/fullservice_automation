@@ -25,7 +25,7 @@ fullservice_automation/
 │   └── README.md                        # frontend dokümantasyonu (dev/build, bileşenler)
 │
 ├── KOD_HAKIMIYETI.md                    # Java'dan gelen biri için kod gezisi (dosya dosya)
-├── GELISTIRME_GUNLUGU.md                # mevcut durum + sıradaki adımlar (geliştirme günlüğü)
+├── CHANGELOG.md                # mevcut durum + sıradaki adımlar (geliştirme günlüğü)
 ├── IPERF_REHBERI.md                     # iperf kurulum + sorun giderme rehberi
 ├── DB_YENI_SEMA.drawio                  # hedef birleşik DB şeması (Senaryo 3)
 ├── UML_CLASS_DIAGRAM.drawio             # backend sınıf/modül diyagramı
@@ -186,5 +186,5 @@ sunucuya elle konur. Repo içine **asla** sır yazılmaz.
 ## Lisans / İletişim
 
 İç kullanım (Türk Telekom CPE QA). Geliştirici notları, mevcut durum ve karar
-gerekçeleri [`GELISTIRME_GUNLUGU.md`](GELISTIRME_GUNLUGU.md) içinde; kod gezisi için
+gerekçeleri [`CHANGELOG.md`](CHANGELOG.md) içinde; kod gezisi için
 [`KOD_HAKIMIYETI.md`](KOD_HAKIMIYETI.md).

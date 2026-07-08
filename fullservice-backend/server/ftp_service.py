@@ -74,7 +74,11 @@ def build_target_dir(brand, model, firmware, test_type, node_name) -> str:
 
 # ── TLS bağlantı (GRK ile aynı) ─────────────────────────────────────────
 class ImplicitSessionFTP_TLS(FTP_TLS):
+    """Veri kanalında kontrol kanalının TLS oturumunu yeniden kullanan FTP_TLS
+    (bazı FTPS sunucuları bunu şart koşar)."""
+
     def ntransfercmd(self, cmd, rest=None):
+        """Veri bağlantısını, kontrol kanalının TLS oturumuyla sarmalayarak açar."""
         conn, size = FTP.ntransfercmd(self, cmd, rest)
         if self._prot_p:
             conn = self.context.wrap_socket(
@@ -98,6 +102,7 @@ def _make_ssl_context():
 
 
 def _connect_ftps_secure():
+    """Adres listesini sırayla deneyerek güvenli (TLS) FTPS bağlantısı kurar; olmazsa None."""
     ctx = _make_ssl_context()
     ftps = ImplicitSessionFTP_TLS(context=ctx)
     for addr in FTP_ADDRESSES:
@@ -116,6 +121,7 @@ def _connect_ftps_secure():
 
 
 def _connect_ftp_plain():
+    """TLS kurulamazsa yedek: düz (şifresiz) FTP bağlantısı kurar; olmazsa None."""
     ftp = FTP()
     for addr in FTP_ADDRESSES:
         addr = addr.strip()

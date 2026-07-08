@@ -30,7 +30,7 @@ Frontend (Vue 3 + Vuetify 3): kardeş klasör [`../fullservice-frontend/`](../fu
 > `iperf3 -s` (server), Wi-Fi Mac client olur; trafik iki Mac arasında modem üzerinden akar.
 
 Mevcut durum + sıradaki adımlar için repo kökündeki
-[`GELISTIRME_GUNLUGU.md`](../GELISTIRME_GUNLUGU.md); kod gezisi için
+[`CHANGELOG.md`](../CHANGELOG.md); kod gezisi için
 [`KOD_HAKIMIYETI.md`](../KOD_HAKIMIYETI.md).
 
 ## Klasör yapısı
@@ -176,7 +176,7 @@ log dosyasını sunucuya HTTP upload eder.
 
 - **DB birleştirme:** `copy_` staging tabloları doğrulanınca asıl tablolara taşınacak
   (Senaryo 3: `grk_*` rename + `test_name`/`node_name` + `iperf_test`). Detay:
-  [`../GELISTIRME_GUNLUGU.md`](../GELISTIRME_GUNLUGU.md).
+  [`../CHANGELOG.md`](../CHANGELOG.md).
 - **Saha doğrulaması:** iperf otomatik başlatma + FTP/DB yazımı 4 fiziksel makinede test.
 - **Installer:** tek-tıklık kurulum paketi (statik IP + boot autostart zaten `provisioning/`).
 

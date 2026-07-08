@@ -22,6 +22,8 @@ QB_PASS = "Admin123"
 
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
+    """qBittorrent ile magnet (GTA5) indirme döngüsünü koşturur (gerçek yük). torrent_recycle_gb
+    kadar inince siler/yeniden başlar (0 = sadece %100'de siler). Log dosyası yollarını döner."""
     # GRK ile aynı standart: FULL_Service_torrent_<brand>_<model>_<fw>_<ts>.txt
     log_file = ctx.grk_log_path("torrent", params.brand, params.model, params.firmware)
     magnet = (params.torrent_magnet or "").strip()
@@ -32,6 +34,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         return []
 
     def log(line: str):
+        """Bir satırı zaman damgasıyla torrent log dosyasına ekler."""
         with open(log_file, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"[{datetime.now():%H:%M:%S}] {line}\n")
 

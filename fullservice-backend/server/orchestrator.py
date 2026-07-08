@@ -32,7 +32,12 @@ from server import excel_service
 
 
 class Orchestrator:
+    """FULL Servis'in beyni (sunucuda tek örnek): düğüm kaydı, merkezi ilerleme toplama,
+    başlat/durdur/sıfırla komutlarının tüm agent'lara fan-out'u, sunucu-yerel testlerin
+    koşumu, DB/FTP/bildirim tetikleme ve health-check. Tüm durum bellekte, _lock ile korunur."""
+
     def __init__(self, config: dict):
+        """config'ten düğüm topolojisini kurar, her düğüm için boş test durumları oluşturur."""
         self.config = config
         self.defaults = config.get("defaults", {})
         self.server_lan_ip = config.get("server", {}).get("lan_ip") or detect_lan_ip()
@@ -76,6 +81,7 @@ class Orchestrator:
 
     @staticmethod
     def _blank_test() -> dict:
+        """Bir test için başlangıç (idle) durum sözlüğü döner."""
         return {"progress": 0.0, "status": TestStatus.IDLE.value, "message": "", "updated": None}
 
     # ── Kayıt / heartbeat ────────────────────────────────────
@@ -126,6 +132,8 @@ class Orchestrator:
     # ── İlerleme güncelleme (agent push + sunucu-yerel) ──────
     def update_progress(self, node_id: str, task: str, progress: float,
                         status: str, message: str = ""):
+        """Bir düğüm-testinin ilerleme/durumunu günceller; ölçüm testleri (ping/iperf/wifi)
+        hep birlikte terminal olduğu ilk anda (kenar yakalama) bir kez tamamlanma tetikler."""
         fire = None
         with self._lock:
             node = self.nodes.get(node_id)
@@ -175,6 +183,7 @@ class Orchestrator:
 
     # ── Dashboard durum çıktısı ──────────────────────────────
     def get_state(self) -> dict:
+        """Dashboard'ın çektiği birleşik durum: oturum + test etiketleri + sunucu IP + düğümler."""
         with self._lock:
             return {
                 "session": dict(self.session),
@@ -184,6 +193,7 @@ class Orchestrator:
             }
 
     def _node_view(self, node: dict) -> dict:
+        """Bir düğümün dashboard için sunulan görünümünü üretir (heartbeat 30 sn'den eskiyse offline)."""
         # Heartbeat 30 sn'den eskiyse offline say (sunucu hariç)
         online = node.get("online", False)
         if not node.get("is_server") and node.get("last_seen"):
@@ -227,6 +237,8 @@ class Orchestrator:
 
     # ── Oturum başlat / durdur ───────────────────────────────
     def start_session(self, overrides: dict | None = None) -> dict:
+        """Yeni bir test oturumu başlatır: TestParams'ı kurar, DB'de oturum satırı açar,
+        sunucu-yerel rolleri koşar ve online agent'lara `/start` fan-out'u yapar."""
         overrides = overrides or {}
         with self._lock:
             session_id = datetime.now().strftime("FS_%Y%m%d_%H%M%S")
@@ -312,6 +324,7 @@ class Orchestrator:
                 dispatched.append(nv["node_id"])
             elif nv["online"] and nv["ip"] and nv["agent_port"]:
                 def _dispatch(n=nv):
+                    """Bir agent'a start komutunu gönderip sonucu results'a yazar (thread hedefi)."""
                     results[n["node_id"]] = self._send_start(n, session_id, n["roles"], params)
                 th = threading.Thread(target=_dispatch, daemon=True)
                 th.start()
@@ -381,6 +394,7 @@ class Orchestrator:
             dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
 
         def _work():
+            """Log dosyasını FTP hedef klasörüne yükler (arka plan thread hedefi)."""
             files = [file_path]
             try:
                 if test_type == "Ping":
@@ -398,6 +412,7 @@ class Orchestrator:
         threading.Thread(target=_work, daemon=True).start()
 
     def _send_start(self, nv: dict, session_id: str, roles: list, params: TestParams) -> bool:
+        """Tek bir agent'a `/start` komutunu (rolleri + parametreleri) HTTP ile gönderir."""
         url = f"http://{nv['ip']}:{nv['agent_port']}/start"
         payload = {
             "session_id": session_id,
@@ -426,6 +441,7 @@ class Orchestrator:
                 continue
 
             def _worker(t=test, fn=runner):
+                """Sunucu-yerel tek bir testi koşar (RunContext ile progress/result) — thread hedefi."""
                 ctx = RunContext(
                     node_id="server", session_id=session_id, log_dir=log_dir,
                     progress=lambda p, s, m, _t=t: self.update_progress("server", _t, p, s, m),
@@ -445,6 +461,8 @@ class Orchestrator:
             self._server_threads.append(th)
 
     def stop_session(self) -> dict:
+        """Çalışan tüm testleri durdurur: sunucu-yerel thread'lere ve tüm online agent'lara
+        durma sinyali/`/stop` gönderir (bildirim tetiklemez)."""
         with self._lock:
             self.session["running"] = False
             self.session["ended_at"] = datetime.now().isoformat(timespec="seconds")
@@ -516,6 +534,7 @@ class Orchestrator:
         threads: list[threading.Thread] = []
 
         def _probe(nv):
+            """Bir düğümün /health'ine bakıp erişilebilirlik + gecikme (ms) döner (thread hedefi)."""
             if nv["is_server"]:
                 results[nv["node_id"]] = {"reachable": True, "latency_ms": 0}
                 return

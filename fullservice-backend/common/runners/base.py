@@ -67,6 +67,7 @@ class RunContext:
     result: Optional[ResultCb] = None
 
     def stamp(self) -> str:
+        """Dosya adları için `YYYYMMDD_HHMMSS` biçiminde zaman damgası döner."""
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
     def log_path(self, name: str) -> str:
@@ -89,14 +90,17 @@ class RunContext:
 
 
 def is_windows() -> bool:
+    """Bu makine Windows mu?"""
     return platform.system().lower() == "windows"
 
 
 def is_mac() -> bool:
+    """Bu makine macOS mu?"""
     return platform.system().lower() == "darwin"
 
 
 def is_linux() -> bool:
+    """Bu makine Linux mu?"""
     return platform.system().lower() == "linux"
 
 

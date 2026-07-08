@@ -59,6 +59,7 @@ def _s(val):
 
 
 def db_available() -> bool:
+    """DB bağlantısı (SessionLocal) hazır mı? Değilse tüm yazma fonksiyonları sessizce atlar."""
     return firmware_db.SessionLocal is not None
 
 

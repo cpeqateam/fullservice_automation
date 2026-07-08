@@ -60,6 +60,9 @@ def _compute_ping_stats(log_file: str, target: str, count: int,
 
 
 def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> list[str]:
+    """Verilen hedefe (modem ya da internet IP'si) süre boyunca ping atar, görünür terminalde
+    canlı gösterir, bitince istatistik (toplam/başarı/kayıp/min/max/avg/median/std) hesaplayıp
+    ctx.result ile bildirir. Üretilen log dosyası yollarını döner."""
     if not target:
         ctx.progress(100.0, TestStatus.ERROR.value, f"{label}: hedef IP boş.")
         return []
@@ -136,8 +139,10 @@ def _run_ping(target: str, label: str, params: TestParams, ctx: RunContext) -> l
 
 
 def run_internet(params: TestParams, ctx: RunContext) -> list[str]:
+    """internet_ip'ye (ör. 8.8.8.8) ping testini çalıştırır."""
     return _run_ping(params.internet_ip, "Internet", params, ctx)
 
 
 def run_modem(params: TestParams, ctx: RunContext) -> list[str]:
+    """modem_ip'ye (ör. 192.168.1.1) ping testini çalıştırır."""
     return _run_ping(params.modem_ip, "Modem", params, ctx)

@@ -21,7 +21,12 @@ from common.runners.registry import get_runner
 
 
 class TestExecutor:
+    """Bu agent'ta testleri ayrı thread'lerde koşan yürütücü. Her testin ilerlemesini
+    (`/api/progress`), nihai özetini (`/api/result`) ve log dosyalarını (`/api/logs/upload`)
+    sunucuya iletir."""
+
     def __init__(self, node_id: str, server_url: str):
+        """node_id ve sunucu adresiyle yürütücüyü kurar (durdurma bayrağı + thread listesi)."""
         self.node_id = node_id
         self.server_url = server_url.rstrip("/")
         self._stop = threading.Event()
@@ -51,6 +56,8 @@ class TestExecutor:
 
     # ── tek bir testin yaşam döngüsü ─────────────────────────
     def _run_one(self, test: str, runner, params: TestParams):
+        """Tek bir testi koşar: RunContext'i kurar (progress/stop/result geri çağrıları),
+        runner'ı çalıştırır, hata olursa error bildirir, bitince logları sunucuya yükler."""
         session_dir = os.path.join(LOGS_DIR, self.session_id or "adhoc")
         ctx = RunContext(
             node_id=self.node_id,
@@ -71,6 +78,7 @@ class TestExecutor:
 
     # ── sunucuya bildirim ────────────────────────────────────
     def _push(self, task: str, progress: float, status: str, message: str):
+        """Bir testin anlık ilerleme/durumunu sunucuya (`/api/progress`) iletir (best-effort)."""
         payload = {
             "node_id": self.node_id,
             "session_id": self.session_id or "",
@@ -99,6 +107,7 @@ class TestExecutor:
             pass  # sunucuya ulaşılamasa da test devam etsin
 
     def _upload(self, file_path: str):
+        """Üretilen bir log dosyasını sunucuya (`/api/logs/upload`, multipart) yükler."""
         if not file_path or not os.path.exists(file_path):
             return
         try:
