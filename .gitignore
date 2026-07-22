@@ -13,6 +13,11 @@ dist/
 logs/
 *.log
 
+# PyInstaller paketleme çıktıları (derlenen uygulamalar USB ile dağıtılır, repoya girmez)
+launchers/build/build/
+launchers/build/dist/
+launchers/build/cikti/
+
 # Sırlar (firmware DB / FTP sertifikaları — repoya asla konmaz)
 certs/
 secrets.json

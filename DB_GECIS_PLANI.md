@@ -301,20 +301,36 @@ Not: Sadece tablo/kolon adları değişir; iş mantığını ve testleri koru.
 
 ---
 
-## 3. Faz 6 — Cutover detayları (şimdi değil, en son)
+## 3. Faz 6 — Bugün son bağlama + Pazartesi exe değişimi
 
-Staging (Faz 0–5) doğrulanınca GRK'yı da geçirirken:
+Gerçek akış: canlı 8 GRK setup'ı Pazartesi'ye kadar eski `grk_*` tablolarına yazar
+(dokunmuyoruz). Biz **bugün** GRK kodunu + FULL'ü + paneli yeni tablolara geçirip yeni
+exe/bat üretiyoruz; **Pazartesi** o exe/bat'ı USB ile setuplara taşıyınca onlar da yeni
+tablolara geçer. Yani ortada "DB cutover" ameliyatı yok — sadece şunlar:
 
-1. **GRK kodu:** Prompt A ile geçir; Pazartesi test bilgisayarlarındaki exe'leri
-   yeni build ile değiştir (GRK artık yeni tablolara yazar/okur).
-2. **FK repoint:** `test_session.firmware_id` FK'sini `grk_firmware`'den `firmware`'e taşı
-   (FULL Servis Faz 4'te zaten `firmware`/`users` okuyor; bu son bağ). Önce FK adını gör:
-   `SELECT conname FROM pg_constraint WHERE conrelid='test_session'::regclass AND contype='f';`
-3. **Interim delta:** GRK, staging boyunca `grk_*`'a yazdı. Kopyalama sonrası eklenen
-   GRK kayıtlarını (`WHERE created_at > <SQL-3 zamanı>`) yeni tablolara aktar
-   (SQL-3'teki eşleme yöntemiyle, yeni id vererek).
-5. Her şey oturunca `grk_*`, `copy_*` (kalan) ve `yedek_*` arşivlenir/silinir.
+1. **FK'yi firmware'e bağla (bugün, tek SQL).** `test_session.firmware_id`'nin işaret
+   ettiği tabloyu `grk_firmware`'den yeni `firmware`'e çevir — yoksa GRK'dan yeni firmware
+   eklenip test koşulunca hata verir. Önce kural var mı + adı ne, gör:
+   ```sql
+   SELECT conname, confrelid::regclass AS gosterdigi
+   FROM pg_constraint WHERE conrelid='test_session'::regclass AND contype='f';
+   ```
+   `grk_firmware` gösteriyorsa (conname'i X diyelim):
+   ```sql
+   ALTER TABLE test_session DROP CONSTRAINT X;
+   ALTER TABLE test_session
+     ADD CONSTRAINT test_session_firmware_fk
+     FOREIGN KEY (firmware_id) REFERENCES firmware(firmware_id);
+   ```
+   (Satır çıkmazsa FK yok; hiçbir şey yapma.)
 
-> Faz 6'yı ayrı bir oturumda, hazır olduğunda yaparız — o zaman bu bölümü SQL'lerle
-> detaylandırırım.
+2. **GRK kodu (bugün):** Prompt A ile güncelle → yeni exe/bat üret.
+
+3. **Pazartesi:** exe/bat'ı USB ile 8 setup'a taşı → GRK setupları da yeni tablolara geçer.
+
+4. **(Opsiyonel) Hafta sonu verisi:** Pazartesi'ye kadar canlı setuplar `grk_*`'a yazmaya
+   devam eder. O kayıtları panelde de görmek istersen, Pazartesi SQL-3'teki yöntemle
+   `grk_*`'tan yeni tablolara taşırız (yeni id vererek). İstemezsen gerek yok.
+
+5. Her şey oturunca `yedek_grk_*` (ve istersen eski `grk_*`) arşivlenir/silinir.
 ```

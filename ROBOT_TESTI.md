@@ -31,7 +31,7 @@ Her şeyin altında bu var: login de, DB'ye yazma da bu tek bağlantıyı (`Sess
 |----|-----|----------|
 | Bağlantı adresi | [firmware_db.py:23-26](fullservice-backend/common/firmware_db.py#L23-L26) | `DB_URL` (cpeqadb). ⚠️ Kimlik koda gömülü — sen **ortam değişkeninden** ver (`FS_FIRMWARE_DB_URL`), koda yazma. |
 | SSL / sertifika ayarı | [firmware_db.py:74-83](fullservice-backend/common/firmware_db.py#L74-L83) | `sslmode=verify-ca` + `ca.crt` / `client.crt` / `client.key`. `engine` + `SessionLocal` burada kurulur. |
-| Sertifika klasörü | [config.py:39](fullservice-backend/common/config.py#L39) | `CERT_DIR = <proje_kökü>/certs/`. Sertifikalar burada aranır. |
+| Sertifika klasörü | [config.py:39](fullservice-backend/common/config.py#L39) | `CERT_DIR = <proje_kökü>/certs/`. Sertifikalar burada aranır. | Bu dosyaları ben flash bellek ile sana vereceğim. 
 | Windows Türkçe yol düzeltmesi | [firmware_db.py:32-67](fullservice-backend/common/firmware_db.py#L32-L67) | `_libpq_safe_path` — yol "Masaüstü" gibi ASCII-dışı karakter içerirse gerekir (Windows'ta libpq sertifikayı bulamıyor). |
 
 ---
@@ -45,7 +45,7 @@ Her şeyin altında bu var: login de, DB'ye yazma da bu tek bağlantıyı (`Sess
 | Şifre kontrolü | [auth_service.py:23-38](fullservice-backend/server/auth_service.py#L23-L38) | `_check_password` — bcrypt → md5 → sha256 → düz metin. |
 | Endpoint | `server/main.py` → `POST /api/login` | HTTP ucu. |
 
-> **Not:** `grk_users` tablosu ortaktır; ekstra tablo açmana gerek yok, doğrudan okunur.
+> **Not:** `grk_users` tablosu ortaktır; ekstra tablo açmaya gerek yok, doğrudan okunur.
 > Tek ihtiyacın **(0)'daki bağlantıdır**.
 
 ---

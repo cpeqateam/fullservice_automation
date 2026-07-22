@@ -45,10 +45,10 @@ iperf **iki rol** ile çalışır; ikisi de aynı anda gerekir:
 
 ```
    ┌─────────────────┐         veri akışı          ┌─────────────────┐
-   │   CLIENT         │ ───────────────────────────▶│   SERVER        │
-   │ iperf3 -c <ip>   │   (TCP/UDP paketleri)        │ iperf3 -s       │
-   │ (gönderir/ölçer) │ ◀───────────────────────────│ (dinler/alır)   │
-   └─────────────────┘         sonuç özeti           └─────────────────┘
+   │   CLIENT        │ ───────────────────────────▶│   SERVER       │
+   │ iperf3 -c <ip>  │   (TCP/UDP paketleri)        │ iperf3 -s      │
+   │ (gönderir/ölçer)│ ◀───────────────────────────│ (dinler/alır)  │
+   └─────────────────┘         sonuç özeti         └─────────────────┘
 ```
 
 - **SERVER** (`iperf3 -s`): Önce çalıştırılır. Bir port açar (varsayılan **5201**)
@@ -66,13 +66,13 @@ Sıra önemlidir: **önce server, sonra client.** Server kapalıyken client bağ
   VoIP/video gibi gerçek-zamanlı trafiği taklit eder. UDP'de hedef hızı `-b` ile verirsin.
 
 ## 5. Kurulum
-| Platform | Komut |
-|----------|-------|
-| **Linux (Ubuntu/Debian)** | `sudo apt install iperf3` |
-| **macOS (Homebrew)** | `brew install iperf3` |
-| **macOS (brew yoksa, eski)** | Kaynaktan: `curl -L -o iperf3.tar.gz https://downloads.es.net/pub/iperf/iperf-3.17.1.tar.gz && tar xzf iperf3.tar.gz && cd iperf-3.17.1 && ./configure && make && sudo make install` |
-| **Windows** | https://files.budman.pw/ veya https://iperf.fr → win64 zip indir → klasöre çıkar (iperf3.exe + cygwin1.dll birlikte) → PATH'e ekle |
-| Doğrulama | `iperf3 --version` |
+| Platform                     | Komut                     |
+|------------------------------|---------------------------|
+| **Linux (Ubuntu/Debian)**    | `sudo apt install iperf3` |
+| **macOS (Homebrew)**         | `brew install iperf3`     |
+| **macOS (brew yoksa, eski)** | Kaynaktan: `curl -L -o iperf3.tar.gz https://downloads.es.net/pub/iperf/iperf-3.17.1.tar.gz && tar xzf iperf3.tar.gz && cd iperf-3.17.1 && ./configure && make && sudo make install`     |
+| **Windows**                  | https://files.budman.pw/ veya https://iperf.fr → win64 zip indir → klasöre çıkar (iperf3.exe + cygwin1.dll birlikte) → PATH'e ekle |
+| Doğrulama                    | `iperf3 --version`        |
 
 ## 6. Komutlar — eksiksiz başvuru
 
@@ -88,23 +88,23 @@ iperf3 -c 192.168.1.11
 ```
 
 ### En çok kullanılan bayraklar
-| Bayrak | Ne yapar | Örnek |
-|--------|----------|-------|
-| `-s` | Server modu (dinle) | `iperf3 -s` |
-| `-c <ip>` | Client modu (bağlan) | `iperf3 -c 192.168.1.11` |
-| `-p <port>` | Port (varsayılan 5201) | `-p 5201` |
-| `-t <sn>` | Süre (saniye, varsayılan 10) | `-t 60` |
-| `-P <n>` | **Paralel akış sayısı** (hattı daha çok doldurur) | `-P 4` |
-| `-i <sn>` | Ara rapor aralığı | `-i 1` |
-| `-u` | UDP modu | `-u -b 100M` |
-| `-b <hız>` | UDP hedef hızı (0 = sınırsız) | `-b 200M` |
-| `-R` / `--reverse` | Ters yön: server gönderir, client alır (indirme ölçer) | `-c <ip> -R` |
-| `--bidir` | Çift yönlü aynı anda | `-c <ip> --bidir` |
-| `-J` | Çıktıyı **JSON** ver (programdan ayrıştırmak için) | `-c <ip> -J` |
-| `-w <boyut>` | TCP pencere boyutu (ileri seviye ayar) | `-w 256K` |
-| `-4` / `-6` | IPv4 / IPv6 zorla | `-4` |
-| `-D` | Server'ı arka planda (daemon) çalıştır | `iperf3 -s -D` |
-| `-1` | Server tek bağlantıdan sonra kapanır | `iperf3 -s -1` |
+| Bayrak             | Ne yapar                                               | Örnek                    |
+|--------------------|--------------------------------------------------------|--------------------------|
+| `-s`               | Server modu (dinle)                                    | `iperf3 -s`              |
+| `-c <ip>`          | Client modu (bağlan)                                   | `iperf3 -c 192.168.1.11` |
+| `-p <port>`        | Port (varsayılan 5201)                                 | `-p 5201`                |
+| `-t <sn>`          | Süre (saniye, varsayılan 10)                           | `-t 60`                  |
+| `-P <n>`           | **Paralel akış sayısı** (hattı daha çok doldurur)      | `-P 4`                   |
+| `-i <sn>`          | Ara rapor aralığı                                      | `-i 1`                   |
+| `-u`               | UDP modu                                               | `-u -b 100M`             |
+| `-b <hız>`         | UDP hedef hızı (0 = sınırsız)                          | `-b 200M`                |
+| `-R` / `--reverse` | Ters yön: server gönderir, client alır (indirme ölçer) | `-c <ip> -R`             |
+| `--bidir`          | Çift yönlü aynı anda                                   | `-c <ip> --bidir`        |
+| `-J`               | Çıktıyı **JSON** ver (programdan ayrıştırmak için)     | `-c <ip> -J`             |
+| `-w <boyut>`       | TCP pencere boyutu (ileri seviye ayar)                 | `-w 256K`                |
+| `-4` / `-6`        | IPv4 / IPv6 zorla                                      | `-4`                     |
+| `-D`               | Server'ı arka planda (daemon) çalıştır                 | `iperf3 -s -D`           |
+| `-1`               | Server tek bağlantıdan sonra kapanır                   | `iperf3 -s -1`           |
 
 ### Sık senaryolar
 ```bash
@@ -152,21 +152,20 @@ hat o hızı kaldıramıyor demektir.
   olmadan "abanma" testi eksik kalır (sadece ping/youtube/torrent yükü olur).
 
 ## 9. Sık hatalar / sorun giderme
-| Mesaj | Sebep | Çözüm |
-|-------|-------|-------|
-| `Connection refused` | Server çalışmıyor / yanlış IP-port | Önce `iperf3 -s` çalıştır, IP/portu doğrula |
-| `unable to connect / timed out` | Güvenlik duvarı 5201'i kapatıyor | Server'da portu aç (Win: Defender Firewall; Linux: `ufw allow 5201`) |
-| `the server is busy running a test` | Server zaten bir testte | Bitmesini bekle ya da ayrı port kullan |
-| `error: control socket has closed unexpectedly` | Sürüm uyumsuz (iperf2↔iperf3) | İki uçta da iperf3 kullan |
-| `command not found` | iperf3 kurulu değil | Bölüm 5'teki kurulum |
-| Çok düşük hız | Wi-Fi/kablo/CPU darboğazı | `-P 4` paralel dene; kabloyu/kartı kontrol et |
+| Mesaj                                           | Sebep                              | Çözüm                                                                |
+|-------------------------------------------------|------------------------------------|----------------------------------------------------------------------|
+| `Connection refused`                            | Server çalışmıyor / yanlış IP-port | Önce `iperf3 -s` çalıştır, IP/portu doğrula                          |
+| `unable to connect / timed out`                 | Güvenlik duvarı 5201'i kapatıyor   | Server'da portu aç (Win: Defender Firewall; Linux: `ufw allow 5201`) |
+| `the server is busy running a test`             | Server zaten bir testte            | Bitmesini bekle ya da ayrı port kullan                               |
+| `error: control socket has closed unexpectedly` | Sürüm uyumsuz (iperf2↔iperf3)      | İki uçta da iperf3 kullan                                            |
+| `command not found`                             | iperf3 kurulu değil                | Bölüm 5'teki kurulum                                                 |
+| Çok düşük hız                                   | Wi-Fi/kablo/CPU darboğazı          | `-P 4` paralel dene; kabloyu/kartı kontrol et                        |
 
 ---
 
 # BÖLÜM B — FULL Servis projesinde iperf
 
-## 10. Bizim topolojimiz (ÖNEMLİ — değişti)
-Eskiden Linux sunucu iperf server'dı. **Artık değil.** Güncel kurulum:
+## 10. Bizim topolojimiz 
 
 ```
    ┌──────────────────────┐     iperf3 trafiği      ┌──────────────────────┐
@@ -184,14 +183,14 @@ Eskiden Linux sunucu iperf server'dı. **Artık değil.** Güncel kurulum:
 - Linux sunucu iperf'e karışmaz (sadece orkestrasyon + kendi ping/youtube testleri).
 
 ## 11. Hangi dosyalar? (kod haritası)
-| Dosya | Görevi |
-|-------|--------|
-| [`common/runners/iperf_server_runner.py`](fullservice-backend/common/runners/iperf_server_runner.py) | Kablolu Mac'te `iperf3 -s -p <port>` çalıştırır; süre boyunca dinler, durdurulunca/bitince kapanır. |
-| [`common/runners/iperf_runner.py`](fullservice-backend/common/runners/iperf_runner.py) | Wi-Fi Mac'te `iperf3 -c <server> -p <port> -t <süre> -P <paralel>` çalıştırır; server hazır değilse **5 kez yeniden dener**; özeti (gönderen/alıcı hız) log'dan ayrıştırır. |
-| [`common/runners/registry.py`](fullservice-backend/common/runners/registry.py) | `"iperf_server" → iperf_server_runner.run`, `"iperf" → iperf_runner.run` eşlemesi. |
-| [`common/protocol.py`](fullservice-backend/common/protocol.py) | `TestType.IPERF_SERVER`/`IPERF`; `TestParams` içinde `iperf_server` (hedef IP), `iperf_port` (5201), `iperf_parallel` (4). |
-| [`server/orchestrator.py`](fullservice-backend/server/orchestrator.py) | `_iperf_server_ip()` → client'ın bağlanacağı adresi (kablolu Mac'in kayıtlı IP'si; yoksa config `network.assignments`) çözer ve `TestParams.iperf_server`'a koyar. |
-| [`config.json`](fullservice-backend/config.json) | `nodes`: mac_cable rolünde `iperf_server`, mac_wifi rolünde `iperf`. `defaults.iperf_port=5201`, `iperf_parallel=4`. |
+| Dosya                                                                                                | Görevi                                                                             |
+|------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| [`common/runners/iperf_server_runner.py`](fullservice-backend/common/runners/iperf_server_runner.py) | Kablolu Mac'te `iperf3 -s -p <port>` çalıştırır; süre boyunca dinler, durdurulunca bitince kapanır. |
+| [`common/runners/iperf_runner.py`](fullservice-backend/common/runners/iperf_runner.py)               | Wi-Fi Mac'te `iperf3 -c <server> -p <port> -t <süre> -P <paralel>` çalıştırır; server hazır değilse **5 kez yeniden dener**; özeti (gönderen/alıcı hız) log'dan ayrıştırır. |
+| [`common/runners/registry.py`](fullservice-backend/common/runners/registry.py)                       | `"iperf_server" → iperf_server_runner.run`, `"iperf" → iperf_runner.run` eşlemesi. |
+| [`common/protocol.py`](fullservice-backend/common/protocol.py)                                       | `TestType.IPERF_SERVER`/`IPERF`; `TestParams` içinde `iperf_server` (hedef IP), `iperf_port` (5201), `iperf_parallel` (4). |
+| [`server/orchestrator.py`](fullservice-backend/server/orchestrator.py)                               | `_iperf_server_ip()` → client'ın bağlanacağı adresi (kablolu Mac'in kayıtlı IP'si; yoksa config `network.assignments`) çözer ve `TestParams.iperf_server`'a koyar. |
+| [`config.json`](fullservice-backend/config.json)                                                     | `nodes`: mac_cable rolünde `iperf_server`, mac_wifi rolünde `iperf`. `defaults.iperf_port=5201`, `iperf_parallel=4`. |
 
 ## 12. Akış (oturum başlayınca)
 1. Dashboard "Başlat" → orchestrator `TestParams` hazırlar; `iperf_server` =
@@ -221,8 +220,7 @@ Hız satırı (Mbits/sec) geliyorsa iperf altyapısı sağlam demektir; sorun ot
 tarafındadır.
 
 ## 15. Mevcut durum (2026-06-17)
-⚠️ **iperf otomasyon içinden henüz düzgün başlamıyor** ("başlatılamıyor"). Yarın
-bakılacak. İlk kontrol noktaları:
+
 - İki Mac'te `iperf3 --version` çalışıyor mu?
 - `_iperf_server_ip()` doğru IP'yi mi döndürüyor? (kablolu Mac kayıt olmuş mu,
   IP'si `192.168.1.11` mi)

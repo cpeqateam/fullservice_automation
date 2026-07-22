@@ -14,6 +14,29 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/), sürümleme
 ### Eklendi
 - Formal `CHANGELOG.md` (eski `GELISTIRME_GUNLUGU.md` bunun yerine geçti).
 - Backend genelinde eksik **docstring**'ler tamamlandı (modül/sınıf/fonksiyon).
+- **Tek-tık paketleme (PyInstaller)**: son kullanıcı artık Python/venv/kaynak kod
+  olmadan çift tıklayarak çalıştırıyor.
+  - `launchers/build/`: `server_app.py`, `agent_app.py` giriş noktaları; `*.spec`
+    tarifleri; `derle-linux.sh` / `derle-mac.sh` / `derle-windows.bat`.
+  - Uygulama adları: `FULLSERVIS-SUNUCU`, `FULLSERVIS-MAC-WIFI`,
+    `FULLSERVIS-MAC-KABLO`, `FULLSERVIS-WINDOWS-WIFI`.
+  - `common/app_boot.py`: eski örneği kapatma (`free_port`), panelin varsayılan
+    tarayıcıda otomatik açılması (`open_browser_later`, `FS_NO_BROWSER` ile kapatılır),
+    hata olunca pencerenin açık kalması.
+  - `common/config.py`: **agent kimliği uygulamanın dosya adından** çözülüyor
+    (`resolve_node_id`) — `python run_agent.py mac_wifi <url>` yazmaya gerek yok;
+    `ayarlar/agent.json` ve `FS_NODE_ID` ile ezilebilir.
+  - Tek rehber: `launchers/KURULUM.md` (derleme + odaya kurulum + günlük kullanım).
+
+### Kaldırıldı
+- Eski venv tabanlı başlatıcılar (`launchers/baslat-*.bat|sh|command`) ve dağınık
+  paketleme belgeleri — yerlerini derlenen uygulamalar + tek `KURULUM.md` aldı.
+
+### Değişti
+- `common/config.py` **donmuş (frozen) modu** destekliyor: kod ve panel exe'nin içinde,
+  `config.json` / `secrets.json` / `certs/` / `logs/` ise exe'nin yanındaki
+  `ayarlar/` + `logs/` klasörlerinde → IP/süre değişikliği için yeniden derleme gerekmez,
+  sırlar exe'ye gömülmez.
 
 ### Yapılacak / sürüyor
 - DB birleştirme **cutover**: GRK exe'lerinin 8 setup'a taşınması; `test_session.firmware_id`

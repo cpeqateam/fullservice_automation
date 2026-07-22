@@ -110,6 +110,11 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
 - [`fullservice-backend/run_agent.py`](fullservice-backend/run_agent.py) — her
   client'ta çalışan **agent** main'i. Argümanları (node_id, server_url, port) ortam
   değişkenine koyup `agent/main.py`'deki `app`'i başlatır.
+- [`launchers/build/server_app.py`](launchers/build/server_app.py) +
+  [`agent_app.py`](launchers/build/agent_app.py) — **son kullanıcının çift tıkladığı**
+  paketlenmiş uygulamaların giriş noktaları (PyInstaller). Yukarıdaki iki `run_*.py`'nin
+  "terminalsiz" hali: eski örneği kapatır, agent kimliğini **dosya adından** çözer,
+  sunucuda paneli tarayıcıda açar. Derleme/kurulum: [`launchers/KURULUM.md`](launchers/KURULUM.md).
 
 ### 3.2 Sunucu tarafı (`server/`)
 - [`server/main.py`](fullservice-backend/server/main.py) — **Controller katmanı.**
@@ -164,7 +169,12 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
 - [`common/config.py`](fullservice-backend/common/config.py) — `config.json`'u okur;
   `node_log_folder()`, `detect_lan_ip()` gibi yardımcılar. Ayrıca **`get_secret(key)`**:
   sırları önce ortam değişkeninden, yoksa gitignore'lu `secrets.json`'dan okur (kodda
-  asla hardcoded sır yok).
+  asla hardcoded sır yok). **Paketlenmiş modda** (`IS_FROZEN`) yollar `app_dir()` ile
+  exe'nin yanındaki `ayarlar/` + `logs/` klasörlerine çözülür; `resolve_node_id()`
+  agent'ın kimliğini uygulamanın dosya adından bulur.
+- [`common/app_boot.py`](fullservice-backend/common/app_boot.py) — çift tıklanan
+  uygulamaların açılış yardımcıları: `free_port()` (eski örneği kapat),
+  `open_browser_later()` (paneli aç), `banner()`, `hold_on_error()`.
 - [`common/firmware_db.py`](fullservice-backend/common/firmware_db.py) — Marka/Model/
   Firmware için PostgreSQL erişimi (SSL). Bağlantı kurulamazsa **çökmez**, üst katman
   serbest-metne düşer.

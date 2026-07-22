@@ -1,0 +1,15 @@
+# Satır sonu (line ending) kuralları.
+#
+# Kod Windows'ta yazılıp Linux/Mac'te çalıştırıldığı için ÖNEMLİ: shell scriptleri
+# Windows satır sonuyla (CRLF) giderse Linux/Mac'te "bad interpreter: /bin/bash^M"
+# hatası verir ve derleme scriptleri çalışmaz. Bu yüzden .sh/.command daima LF olur.
+*.sh        text eol=lf
+*.command   text eol=lf
+
+# Windows'ta çalışan dosyalar CRLF kalsın
+*.bat       text eol=crlf
+
+# İkili dosyalar dönüştürülmesin
+*.png       binary
+*.xlsx      binary
+*.exe       binary

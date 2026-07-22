@@ -43,7 +43,20 @@
       "Bash(python -m py_compile server/ftp_service.py server/orchestrator.py server/main.py)",
       "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); import server.main; from server import ftp_service as f; print\\('IMPORT_OK'\\); print\\(f.build_target_dir\\('ZYXEL','EX5601','v1.0', f.test_type_from_filename\\('full_mac_wifi_iperf_20260623.txt'\\),'MAC_WIFI'\\)\\); print\\(f.build_target_dir\\('ZYXEL','EX5601','v1.0', f.test_type_from_kind\\('ping'\\),'WIN_WIFI'\\)\\)\")",
       "Bash(python3 -m py_compile server/excel_service.py server/orchestrator.py)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python -m py_compile server/auth_service.py server/main.py common/protocol.py common/runners/base.py common/runners/ping_runner.py common/runners/iperf_runner.py common/runners/iperf_server_runner.py common/runners/wifi_track_runner.py common/runners/youtube_runner.py common/runners/torrent_runner.py server/orchestrator.py)",
+      "Bash(python -m py_compile server/notify.py server/email_sender.py server/notification_service.py server/orchestrator.py server/main.py)",
+      "Bash(python -m py_compile server/log_capture.py server/orchestrator.py server/main.py server/notification_service.py)",
+      "Bash(python -m py_compile server/orchestrator.py)",
+      "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); import server.main; print\\('OK'\\)\")",
+      "Bash(git commit *)",
+      "Bash(python -c \"import xml.dom.minidom as m; m.parse\\('UML_CLASS_DIAGRAM.drawio'\\); print\\('UML_CLASS: gecerli XML'\\)\")",
+      "Bash(python -c \"import xml.dom.minidom as m; m.parse\\('DB_YENI_SEMA.drawio'\\); print\\('DB_YENI: gecerli'\\)\")",
+      "Bash(python -m py_compile test_notify.py)",
+      "Bash(python -m py_compile common/runners/wifi_track_runner.py)",
+      "Bash(git log *)",
+      "Bash(git filter-repo *)",
+      "Bash(pip show *)"
     ]
   }
 }
