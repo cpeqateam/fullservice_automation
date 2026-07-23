@@ -8,6 +8,10 @@ ekler — durdurulana kadar. Magnet, config.json defaults.torrent_magnet'ten gel
 
 Yalnızca Windows düğümünde (win_wifi) çalışır. qBittorrent kurulu ve Web UI açık
 (admin/Admin123, port 8080) olmalıdır.
+
+Torrent yalnızca YÜK BASICIDIR; ölçüm/rapor üretmez. Bu yüzden LOG DOSYASI ÜRETMEZ
+(kullanıcı isteri) — ilerleme yalnızca konsola yazılır ve boş liste döner, dolayısıyla
+FTP/Telegram/DB'ye hiçbir şey gitmez.
 """
 import time
 from datetime import datetime
@@ -23,9 +27,7 @@ QB_PASS = "Admin123"
 
 def run(params: TestParams, ctx: RunContext) -> list[str]:
     """qBittorrent ile magnet (GTA5) indirme döngüsünü koşturur (gerçek yük). torrent_recycle_gb
-    kadar inince siler/yeniden başlar (0 = sadece %100'de siler). Log dosyası yollarını döner."""
-    # GRK ile aynı standart: FULL_Service_torrent_<brand>_<model>_<fw>_<ts>.txt
-    log_file = ctx.grk_log_path("torrent", params.brand, params.model, params.firmware)
+    kadar inince siler/yeniden başlar (0 = sadece %100'de siler). Log üretmez; boş liste döner."""
     magnet = (params.torrent_magnet or "").strip()
 
     if not magnet:
@@ -34,13 +36,10 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         return []
 
     def log(line: str):
-        """Bir satırı zaman damgasıyla torrent log dosyasına ekler."""
-        with open(log_file, "a", encoding="utf-8", errors="replace") as f:
-            f.write(f"[{datetime.now():%H:%M:%S}] {line}\n")
+        """İlerlemeyi konsola yazar (dosya üretilmez — kullanıcı isteri)."""
+        print(f"[TORRENT:{ctx.node_id}] [{datetime.now():%H:%M:%S}] {line}")
 
-    with open(log_file, "w", encoding="utf-8", errors="replace") as f:
-        f.write(f"FULL Servis Torrent (qBittorrent) — Node: {ctx.node_id}\n")
-        f.write(f"Baslangic: {datetime.now()}\nMagnet: {magnet[:80]}...\n" + "-" * 30 + "\n")
+    log(f"Baslangic. Magnet: {magnet[:80]}...")
 
     try:
         ctx.progress(0.0, TestStatus.RUNNING.value, "qBittorrent başlatılıyor...")
@@ -49,7 +48,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             msg = "qBittorrent başlatılamadı veya Web UI port 8080'de açılmadı. qBittorrent'i elle aç → Tools→Options→Web UI: aktif, port 8080."
             log(msg)
             ctx.progress(100.0, TestStatus.ERROR.value, msg)
-            return [log_file]
+            return []
 
         session = torrent_util.login_qbittorrent(QB_URL, QB_USER, QB_PASS)
         if not session:
@@ -61,7 +60,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             )
             ctx.progress(100.0, TestStatus.ERROR.value, msg)
             log(f"Web UI giris basarisiz. {msg}")
-            return [log_file]
+            return []
 
         # Bu kadar bayt inince hepsini silip yeniden başla (disk dolmasın + sürekli yük).
         # 0 ise: yalnızca %100 tamamlanınca sil.
@@ -107,9 +106,9 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
         torrent_util.remove_all_torrents(session, QB_URL)
         ctx.progress(100.0, TestStatus.STOPPED.value, "Torrent durduruldu (dosyalar silindi)")
         log("Durduruldu, dosyalar silindi.")
-        return [log_file]
+        return []
 
     except Exception as e:
         ctx.progress(100.0, TestStatus.ERROR.value, f"Torrent hatası: {e}")
         log(f"HATA: {e}")
-        return [log_file]
+        return []

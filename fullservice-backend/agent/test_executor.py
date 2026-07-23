@@ -14,7 +14,7 @@ import threading
 
 import requests
 
-from common.config import LOGS_DIR
+from common.config import LOGS_DIR, node_log_folder
 from common.protocol import StartCommand, TestParams, TestStatus
 from common.runners.base import RunContext
 from common.runners.registry import get_runner
@@ -28,6 +28,8 @@ class TestExecutor:
     def __init__(self, node_id: str, server_url: str):
         """node_id ve sunucu adresiyle yürütücüyü kurar (durdurma bayrağı + thread listesi)."""
         self.node_id = node_id
+        # Log dosya adına girecek client adı (MAC_ETH / MAC_WIFI / WIN_WIFI)
+        self.node_name = node_log_folder(node_id)
         self.server_url = server_url.rstrip("/")
         self._stop = threading.Event()
         self._threads: list[threading.Thread] = []
@@ -66,6 +68,7 @@ class TestExecutor:
             progress=lambda p, s, m: self._push(test, p, s, m),
             stop=self._stop,
             result=lambda kind, stats, _t=test: self._report_result(_t, kind, stats),
+            node_name=self.node_name,
         )
         logs: list[str] = []
         try:

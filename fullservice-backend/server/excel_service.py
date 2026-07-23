@@ -3,10 +3,13 @@ Excel üretim servisi (FULL Servis, sunucu tarafı) — ping ve wifi log dosyala
 GRK ile BİREBİR aynı yapıda Excel raporları üretir.
 
 GRK karşılıkları (port edildi):
-  • Ping  → app/utils/wifi/analiz/pinganaliz/pingLogParser.py
-            (Statistics + Graph + Data sayfaları, anomali tespiti, ping süre grafiği)
+  • Ping  → app/utils/wifi/analiz/pinganaliz/pingLogParser.py + merge_parser.py
+            (BİLGİSAYAR BAŞINA tek ÖZET Excel: modem + internet, IPv4/IPv6 tüm ping
+             logları tek dosyada birleşir — Statistics + Graphs + Data sayfaları,
+             anomali tespiti, her hedef için ping süre grafiği)
   • Wifi  → app/utils/wifi/analiz/wifianaliz/parse.py + chart.py
-            (Veriler + Özet + Grafikler sayfaları, 10 alt grafik)
+            (Veriler + Özet + Grafikler sayfaları, 10 alt grafik). Bilgisayar başına
+            tek wifi logu olduğu için wifi'de birleştirme yok, log→Excel birebir.
 
 TEK FARK (zorunlu): GRK ping parser'ı yalnızca Windows ping formatını
 ("Reply from X: ... time=12ms") tanır. FULL Servis Linux sunucu ve iki Mac'te de
@@ -170,75 +173,147 @@ def _ping_time_graph(df):
     return fig
 
 
-def ping_log_to_excel(txt_path: str) -> str | None:
-    """Ping log .txt → GRK formatında .xlsx (Statistics + Graph + Data).
-    Üretilen Excel dosyasının yolunu döner; veri yoksa/araç yoksa None."""
+def _ip_version(ip: str) -> str:
+    """IP adresinde ':' varsa 'IPv6', aksi halde 'IPv4' (GRK _detect_ip_version portu)."""
+    return "IPv6" if (ip and ":" in ip) else "IPv4"
+
+
+# Statistics sayfasındaki sütunlar — GRK merge_parser.stats_keys ile birebir,
+# başına iki FULL Servis alanı: hangi bilgisayar + hangi ham log dosyası.
+_PING_STATS_KEYS = [
+    "source_computer", "source_file", "target_ip", "ip_version",
+    "total_pings", "successful_pings", "failed_pings",
+    "success_rate", "packet_loss_percentage",
+    "avg_time", "min_time", "max_time", "std_dev",
+    "test_start_time", "test_end_time",
+]
+
+# Data sayfası satır tavanı — Telegram 50 MB sınırını aşmamak için (GRK ile aynı)
+_PING_MAX_DATA_ROWS = 200_000
+
+
+def ping_summary_excel(txt_paths: list[str], node_name: str,
+                       brand=None, model=None, firmware=None,
+                       out_dir: str | None = None,
+                       test_start_time=None) -> str | None:
+    """TEK BİR BİLGİSAYARIN tüm ping loglarını (modem + internet, IPv4/IPv6) birleştirip
+    tek bir ÖZET Excel'i üretir — GRK merge_parser.merge_ping_logs portu.
+
+    Sayfalar (GRK ile birebir):
+      • Statistics : her ham log için bir satır (hedef IP, kayıp %, min/max/avg/std…)
+      • Graphs     : her hedef için ping süre grafiği (anomaliler işaretli), alt alta
+      • Data       : tüm logların ham satırları (source_computer/source_file sütunlu,
+                     çok uzun testlerde eşit aralıklı downsample)
+
+    İsimlendirme GRK ile birebir, TEK farkı araya giren bilgisayar (client) adı:
+        GRK  : grk_ping_ozet_<marka>_<model>_<fw>_<zaman>.xlsx
+        BURADA: FULL_Service_ping_ozet_<BILGISAYAR>_<marka>_<model>_<fw>_<zaman>.xlsx
+
+    Üretilen Excel'in yolunu döner; hiç veri yoksa / bağımlılık yoksa None."""
     try:
-        import pandas as pd  # noqa: F401
+        import pandas as pd
         import numpy as np
         from matplotlib.backends.backend_agg import FigureCanvasAgg
     except Exception as e:
-        print(f"[EXCEL] Ping Excel atlandi (bagimlilik yok): {e}")
+        print(f"[EXCEL] Ping ozet atlandi (bagimlilik yok): {e}")
         return None
 
-    try:
-        df, target_ip = _parse_ping_log(txt_path)
-    except Exception as e:
-        print(f"[EXCEL] Ping parse hatasi: {e}")
+    valid = [p for p in (txt_paths or []) if p and os.path.exists(p)]
+    if not valid:
         return None
 
-    if df is None or df.empty:
-        print(f"[EXCEL] Ping logunda veri yok, Excel uretilmedi: {os.path.basename(txt_path)}")
-        return None
+    from common.runners.base import grk_style_filename
+    fname = grk_style_filename("ping_ozet", brand, model, firmware, client=node_name, ext="xlsx")
+    out_path = os.path.join(out_dir or os.path.dirname(valid[0]), fname)
+    start_ts = test_start_time or datetime.now()
+    if isinstance(start_ts, str):
+        try:
+            start_ts = datetime.fromisoformat(start_ts)
+        except ValueError:
+            start_ts = datetime.now()
 
-    stats = _ping_statistics(df)
-    df = _ping_identify_anomalies(df)
-
-    out_path = os.path.splitext(txt_path)[0] + ".xlsx"
     try:
         with pd.ExcelWriter(out_path, engine="xlsxwriter") as writer:
             wb = writer.book
+            header_fmt = wb.add_format({"bold": True, "bg_color": "#D3D3D3"})
 
-            # --- Statistics sayfası (anahtar/değer, satır satır) ---
-            ws = wb.add_worksheet("Statistics")
-            header_fmt = wb.add_format({"bold": True, "font_size": 12, "align": "left", "valign": "vcenter"})
-            data_fmt = wb.add_format({"align": "left", "valign": "vcenter"})
-            row = 0
-            for key, value in stats.items():
-                ws.write(row, 0, key, header_fmt)
-                if isinstance(value, float) and not key.endswith("_time"):
-                    ws.write(row, 1, f"{value:.2f}", data_fmt)
-                else:
-                    ws.write(row, 1, value, data_fmt)
+            ws_stats = wb.add_worksheet("Statistics")
+            for col_idx, key in enumerate(_PING_STATS_KEYS):
+                ws_stats.write(0, col_idx, key, header_fmt)
+                ws_stats.set_column(col_idx, col_idx, 18)
+
+            ws_graphs = wb.add_worksheet("Graphs")
+            graph_row = 1
+            row = 1
+            all_dfs = []
+
+            for path in valid:
+                try:
+                    df, target_ip = _parse_ping_log(path)
+                except Exception as e:
+                    print(f"[EXCEL] Ping parse hatasi ({os.path.basename(path)}): {e}")
+                    continue
+                if df is None or df.empty:
+                    continue
+
+                stats = _ping_statistics(df)
+                df = _ping_identify_anomalies(df)
+
+                stats["source_computer"] = node_name
+                stats["source_file"] = os.path.basename(path)
+                stats["ip_version"] = _ip_version(stats.get("target_ip") or "")
+                stats["test_start_time"] = start_ts.strftime("%Y-%m-%d %H:%M:%S")
+                stats["test_end_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                for col_idx, key in enumerate(_PING_STATS_KEYS):
+                    val = stats.get(key, "N/A")
+                    ws_stats.write(row, col_idx, round(val, 2) if isinstance(val, float) else val)
                 row += 1
-            ws.set_column(0, 0, 20)
-            ws.set_column(1, 1, 15)
 
-            # --- Graph sayfası (ping süre grafiği PNG) ---
-            ws_g = wb.add_worksheet("Graph")
-            fig = _ping_time_graph(df)
-            FigureCanvasAgg(fig)
-            img = BytesIO()
-            fig.savefig(img, format="png")
-            img.seek(0)
-            ws_g.insert_image("B2", "", {"image_data": img})
-            ws_g.set_column("A:A", 2)
-            ws_g.set_column("B:K", 15)
-            ws_g.set_row(1, 400)
+                df["source_computer"] = node_name
+                df["source_file"] = os.path.basename(path)
+                all_dfs.append(df)
 
-            # --- Data sayfası (ham satırlar) ---
-            df = df.replace([np.inf, -np.inf], np.nan)
-            df.to_excel(writer, sheet_name="Data", index=False, na_rep="")
-            ws_d = writer.sheets["Data"]
-            for idx, col in enumerate(df.columns):
+                # Grafik başarısız olursa Excel'i iptal etme — istatistik/data yine gitsin
+                try:
+                    fig = _ping_time_graph(df)
+                    FigureCanvasAgg(fig)
+                    img = BytesIO()
+                    fig.savefig(img, format="png")
+                    img.seek(0)
+                    ws_graphs.write(graph_row, 0,
+                                    f"{node_name} — Hedef IP: {stats.get('target_ip')}", header_fmt)
+                    ws_graphs.insert_image(graph_row + 1, 0, "", {"image_data": img})
+                    graph_row += 45
+                except Exception as e:
+                    print(f"[EXCEL] Ping grafik hatasi ({os.path.basename(path)}): {e}")
+
+            if not all_dfs:
+                raise ValueError("hicbir ping logunda veri yok")
+
+            combined = pd.concat(all_dfs, ignore_index=True).replace([np.inf, -np.inf], np.nan)
+            if len(combined) > _PING_MAX_DATA_ROWS:
+                step = max(1, len(combined) // _PING_MAX_DATA_ROWS)
+                view = combined.iloc[::step].reset_index(drop=True)
+                print(f"[EXCEL] Ping Data downsample: {len(combined)} -> {len(view)} (step={step})")
+            else:
+                view = combined
+            view.to_excel(writer, sheet_name="Data", index=False, na_rep="")
+            ws_data = writer.sheets["Data"]
+            for idx, col in enumerate(view.columns):
                 width = max(len(str(col)),
-                            df[col].astype(str).str.len().max() if not df.empty else 0)
-                width = min(width + 2, 100) if col != "raw_data" else min(width, 100)
-                ws_d.set_column(idx, idx, width)
-        print(f"[EXCEL] Ping Excel uretildi: {os.path.basename(out_path)}")
+                            view[col].astype(str).str.len().max() if not view.empty else 0)
+                ws_data.set_column(idx, idx, min(width + 2, 100))
+
+        print(f"[EXCEL] Ping ozet Excel uretildi: {os.path.basename(out_path)}")
         return out_path
     except Exception as e:
-        print(f"[EXCEL] Ping Excel yazma hatasi: {e}")
+        print(f"[EXCEL] Ping ozet uretilemedi ({node_name}): {e}")
+        # Yarım kalan dosya FTP/Telegram'a gitmesin
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
         return None
 
 

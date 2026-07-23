@@ -2,9 +2,16 @@
 FULL Servis bildirim servisi — test bitince Telegram + mail gönderir.
 
 GRK app/services/notification_service.py ile AYNI davranış:
-  • Telegram (aynı grup): tamamlanma mesajı (GRK formatı) + özet log dosyaları.
+  • Telegram (aynı grup): tamamlanma mesajı (GRK formatı) + ÖZET dosyalar.
   • Mail (aynı adresler): yalnızca mesaj, DOSYA EKİ YOK.
 Telegram 50 MB üstü dosya gönderilmez, yerine uyarı mesajı atılır.
+
+Telegram'a NE gider (kullanıcı isteri — ham .txt yığını gönderilmez):
+  • Ping özet Excel'leri     (bilgisayar başına tek dosya, adı bilgisayarı içerir)
+  • Wi-Fi analiz Excel'leri  (bilgisayar başına, adı bilgisayarı içerir)
+  • iperf .txt raporları
+Diğer ham loglar (ping/youtube/torrent/wifi .txt) yalnızca FTP'ye ve sunucunun
+logs/ klasörüne yazılır, Telegram'a gönderilmez.
 
 Tetikleme: orchestrator.stop_session() — test bitince (kullanıcı "Durdur" dediğinde)
 arka planda çağrılır. Agent log upload'larının tamamlanması için kısa bir bekleme
@@ -20,7 +27,7 @@ import time
 from datetime import datetime
 from typing import List, Optional
 
-from server import notify, log_collector
+from server import notify, log_collector, report_service
 
 # GRK ile AYNI alıcılar
 TO_ADDRESSES = [
@@ -90,22 +97,49 @@ def send_completion(device: dict, session_id: str, start_time):
     ).start()
 
 
+def _telegram_attachments(paths: List[str]) -> List[str]:
+    """Telegram'a GİDECEK dosyaları süzer (kullanıcı isteri — grup dosyaya boğulmasın):
+
+      • .xlsx  → gider   (bilgisayar başına ping özet + wifi analiz Excel'leri)
+      • iperf .txt → gider (iperf'in raporu zaten metindir)
+      • diğer .txt → GİTMEZ (ping/youtube/torrent/wifi ham logları; hepsi FTP'de ve
+        sunucunun logs/ klasöründe zaten duruyor)
+    """
+    keep = []
+    for p in paths or []:
+        name = os.path.basename(p).lower()
+        if name.endswith(".xlsx"):
+            keep.append(p)
+        elif name.endswith(".txt") and "iperf" in name:
+            keep.append(p)
+    return sorted(keep)
+
+
 def _worker(device: dict, session_id: str, start_time):
-    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) oturumun log dosyalarını
-    toplar, tamamlanma metnini kurup mail (metin) + Telegram (metin + loglar) gönderir."""
+    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) bilgisayar başına ping
+    özet Excel'lerini üretir, oturumun dosyalarını toplayıp süzer, tamamlanma metnini kurup
+    mail (metin) + Telegram (metin + Excel/iperf dosyaları) gönderir."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
+
+    # Her bilgisayarın ping loglarından tek bir özet Excel üret (+ FTP'ye yükle).
+    # Excel'ler oturum klasörüne yazılır; aşağıdaki toplama onları da görür.
+    try:
+        report_service.build_ping_summaries(session_id, device, start_time)
+    except Exception as e:
+        print(f"[NOTIFY] Ping ozet Excel'leri uretilemedi: {e}")
+
     end_time = datetime.now()
     body = _build_body(device, start_time, end_time)
 
     logs = []
     try:
-        logs = log_collector.list_session_files(session_id)
+        logs = _telegram_attachments(log_collector.list_session_files(session_id))
     except Exception as e:
         print(f"[NOTIFY] Log dosyalari toplanamadi: {e}")
 
     _send_email(body)             # mail: yalnızca metin (dosyasız)
-    _send_telegram(body, logs)    # telegram: metin + log dosyaları
+    _send_telegram(body, logs)    # telegram: metin + süzülmüş dosyalar (Excel + iperf)
 
 
 def _send_email(body: str):

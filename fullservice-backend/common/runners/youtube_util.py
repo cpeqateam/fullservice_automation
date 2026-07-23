@@ -12,6 +12,7 @@ otomatik yaparız.
 basit `webbrowser.open` yöntemine geri düşer.
 
 `detach=True` ile script bitince tarayıcı AÇIK kalır (kişi kapatana dek oynar).
+Video TAM EKRAN açılmaz (kullanıcı isteri) — maksimize pencerede normal oynar.
 """
 import time
 
@@ -81,10 +82,8 @@ def force_play_max(link: str) -> dict:
     except Exception as e:
         print(f"[YOUTUBE] Kalite menusu ayarlanamadi (video yine oynuyor): {e}")
 
-    # Tam ekran (maksimum görünürlük) — best-effort
-    try:
-        driver.find_element(By.CSS_SELECTOR, ".ytp-fullscreen-button").click()
-    except Exception:
-        pass
+    # NOT: Tam ekran (fullscreen) AÇILMAZ — kullanıcı isteri. Video normal pencerede,
+    # maksimize edilmiş tarayıcıda oynar (--start-maximized). Böylece kişi ekranda
+    # başka işlem de görebilir.
 
     return {"opened": True, "quality_set": quality_set}

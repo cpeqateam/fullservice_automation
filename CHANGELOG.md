@@ -14,6 +14,42 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/), sürümleme
 ### Eklendi
 - Formal `CHANGELOG.md` (eski `GELISTIRME_GUNLUGU.md` bunun yerine geçti).
 - Backend genelinde eksik **docstring**'ler tamamlandı (modül/sınıf/fonksiyon).
+- **Bilgisayar başına ping özet Excel'i** (`server/report_service.py` +
+  `excel_service.ping_summary_excel`, GRK `merge_parser` portu): her makinenin modem +
+  internet, IPv4/IPv6 tüm ping logları TEK özet Excel'de birleşir (Statistics + Graphs +
+  Data). 4 ping makinesi → 4 özet Excel; oturum sonunda FTP `.../FULLSERVIS/Ping/<BILGISAYAR>/`
+  altına yüklenir ve Telegram'a gönderilir.
+
+### Düzeltildi
+- **Wi-Fi analizinde GERÇEK BSSID** (`common/runners/wifi_util.py`): BSSID artık
+  `00:00:00:00:00:00` gelmiyor. `netsh` (Windows 11) ve `system_profiler` (macOS)
+  BSSID'i gizlilik gereği gizlediği için gerçek değer OS Wi-Fi API'sinden çekiliyor —
+  Windows'ta Native Wifi API (`wlanapi.dll` / `dot11Bssid`), macOS'ta `airport -I` →
+  `wdutil`. `getSignalInfo` ve `getOneTimeInfo` redakte/sıfır değeri görünce gerçeğine
+  düşüyor (`get_wifi_bssid`, `_looks_like_bssid`). Windows'ta gerçek makinede doğrulandı.
+  NOT: en yeni OS sürümlerinde bu API'ler de **Konum izni** ister (macOS 14.4+'da
+  `airport` kaldırıldığı için orada `wdutil`/konum gerekebilir).
+
+### Değişti
+- **Log/Excel isimlendirmesi GRK ile birebir + araya bilgisayar (client) adı**: test
+  tipinden hemen sonra, marka'dan önce. `grk_style_filename`/`grk_log_path` artık
+  `RunContext.node_name`'i kullanıyor. Örnekler:
+  `FULL_Service_ping_<BILGISAYAR>_<marka>_<model>_<fw>_IPv4_8888_<ts>.txt`,
+  `FULL_Service_wifiAnaliz_<BILGISAYAR>_..._60sn_<ts>.txt`,
+  `FULL_Service_ping_ozet_<BILGISAYAR>_<marka>_<model>_<fw>_<ts>.xlsx`.
+- Wifi Excel adı ham logdan türediği için bilgisayar adını otomatik içeriyor
+  (wifi_track koşan her makine için ayrı Excel).
+- Ping için log başına Excel üretimi kaldırıldı (yerine bilgisayar başına birleşik özet).
+- **Telegram VE FTP artık ham log yığını almıyor**: her ikisine de yalnızca rapor dosyaları
+  gidiyor — 4 ping özet `.xlsx`, wifi analiz `.xlsx` (wifi_track koşan makine sayısı kadar),
+  iperf `.txt`. Ham ping/wifi logları yalnızca sunucunun `logs/` klasöründe (yerelde) kalıyor
+  (özet üretimi + DB + arşiv için). `orchestrator.upload_log_to_ftp` artık Ping ham logunu
+  FTP'ye koymuyor; Wifi'de yalnızca üretilen Excel'i, Iperf'te `.txt`'yi gönderiyor.
+- **YouTube ve Torrent artık log DOSYASI ÜRETMİYOR** (yük basıcılar; ölçüm/rapor değiller).
+  İlerleme sadece panelde/konsolda görünür; FTP/Telegram/DB'ye hiçbir şey gitmez.
+- **YouTube TAM EKRAN açılmıyor** (`youtube_util`): video maksimize pencerede normal oynar.
+- DB'ye yazım GRK ile aynı (ping→`ping_test`, wifi→`wifi_analysis`, iperf→`iperf_test`;
+  `test_name='FULL_SERVIS'`) — değişmedi, korundu.
 - **Tek-tık paketleme (PyInstaller)**: son kullanıcı artık Python/venv/kaynak kod
   olmadan çift tıklayarak çalıştırıyor.
   - `launchers/build/`: `server_app.py`, `agent_app.py` giriş noktaları; `*.spec`

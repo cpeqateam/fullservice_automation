@@ -43,12 +43,27 @@ def _name_part(s) -> str:
     return (str(s).strip() if s is not None else "") .replace(" ", "") or "Unknown"
 
 
-def grk_style_filename(kind: str, brand, model, firmware, *extras, ext: str = "txt") -> str:
-    """GRK isimlendirmesinin birebir aynısı (grk → FULL_Service):
-       FULL_Service_<kind>_<brand>_<model>_<firmware>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
-    GRK örnekleri:  grk_ping_..._IPv4_8888_<ts>.txt , grk_wifiAnaliz_..._54sn_<ts>.txt"""
+def grk_style_filename(kind: str, brand, model, firmware, *extras,
+                       client: str | None = None, ext: str = "txt") -> str:
+    """GRK isimlendirmesinin birebir aynısı (grk → FULL_Service), TEK farkla: FULL Servis
+    dağıtık olduğu için isme bir de CLIENT (bilgisayar) adı girer — hangi makineye ait
+    olduğu dosya adından anlaşılsın. Client, GRK'nın tek-makineli isminde olmayan tek
+    ek alandır ve test tipinden hemen sonra, marka'dan önce yerleşir:
+
+       FULL_Service_<kind>_<CLIENT>_<brand>_<model>_<firmware>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
+
+    GRK karşılıkları:
+       grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+         → FULL_Service_ping_<CLIENT>_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+       grk_wifiAnaliz_<brand>_<model>_<fw>_54sn_<ts>.txt
+         → FULL_Service_wifiAnaliz_<CLIENT>_<brand>_<model>_<fw>_54sn_<ts>.txt
+
+    client verilmezse (nadiren) GRK ile birebir aynı, ek alansız isim üretilir."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    parts = [PROJECT_TAG, kind, _name_part(brand), _name_part(model), _name_part(firmware)]
+    parts = [PROJECT_TAG, kind]
+    if client:
+        parts.append(_name_part(client))
+    parts += [_name_part(brand), _name_part(model), _name_part(firmware)]
     parts += [str(e) for e in extras if e not in (None, "")]
     parts.append(ts)
     return "_".join(parts) + f".{ext}"
@@ -65,6 +80,9 @@ class RunContext:
     # Test bitince yapısal özet bildirmek için (opsiyonel). Ayarlanmamışsa runner
     # sadece log/progress üretir, DB'ye bir şey yazılmaz.
     result: Optional[ResultCb] = None
+    # Bu makinenin log adı (LINUX / MAC_ETH / MAC_WIFI / WIN_WIFI). Log dosya adına
+    # girer (grk_log_path). Boşsa node_id'nin büyük harfi kullanılır.
+    node_name: str = ""
 
     def stamp(self) -> str:
         """Dosya adları için `YYYYMMDD_HHMMSS` biçiminde zaman damgası döner."""
@@ -78,13 +96,15 @@ class RunContext:
         return os.path.join(self.log_dir, fname)
 
     def grk_log_path(self, kind: str, brand, model, firmware, *extras, ext: str = "txt") -> str:
-        """GRK ile AYNI isimlendirme standardında log dosyası yolu üretir; tek fark
-        baştaki 'grk' yerine 'FULL_Service'. Örnek:
-          GRK  : grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
-          BURADA: FULL_Service_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+        """GRK ile AYNI isimlendirme standardında log dosyası yolu üretir; iki fark:
+        baştaki 'grk' yerine 'FULL_Service', ve test tipinden sonra bu makinenin
+        CLIENT adı (node_name). Örnek:
+          GRK   : grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+          BURADA: FULL_Service_ping_<CLIENT>_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
         kind  : "ping" | "wifiAnaliz" | "iperf" | "youtube" | "torrent" | ...
         extras: kind'e özgü ek parçalar (topotype, ip, '<sn>sn' vb.)"""
-        fname = grk_style_filename(kind, brand, model, firmware, *extras, ext=ext)
+        client = self.node_name or (self.node_id or "").upper() or None
+        fname = grk_style_filename(kind, brand, model, firmware, *extras, client=client, ext=ext)
         os.makedirs(self.log_dir, exist_ok=True)
         return os.path.join(self.log_dir, fname)
 

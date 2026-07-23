@@ -379,35 +379,46 @@ class Orchestrator:
     def upload_log_to_ftp(self, node_id: str, file_path: str):
         """Bir log dosyasını FTP'ye, doğru klasör yapısına (arka planda) yükler:
         <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
-        Test tipi dosya adından, bilgisayar node'un log adından çözülür.
 
-        Ping ve Wifi logları için ek olarak GRK formatında bir Excel raporu üretilir
-        (ping: istatistik+grafik, wifi: özet+10 grafik) ve aynı klasöre txt ile
-        birlikte yüklenir. Excel üretimi + yükleme tek bir arka plan thread'inde
-        yapılır (matplotlib yavaş olabilir; HTTP yanıtını/worker'ı bloke etmesin)."""
+        FTP'ye SADECE rapor niteliğindeki dosyalar gider (kullanıcı isteri — FTP ham
+        log yığınıyla dolmasın):
+          • WIFI  → ham logdan GRK formatında Excel (Veriler+Özet+10 grafik) üretilir,
+                    FTP'ye YALNIZCA bu Excel gider (ham .txt gitmez). Adı ham logdan
+                    türediği için bilgisayar adını zaten içerir.
+          • IPERF → .txt olduğu gibi gider (iperf'in raporu metindir).
+          • PING  → BURADA FTP'ye HİÇBİR ŞEY gitmez. Ping'in çıktısı, oturum sonunda
+                    bilgisayar başına üretilen tek ÖZET Excel'dir (report_service).
+          • Diğer (youtube/torrent) → zaten log üretmez; gelse bile gönderilmez.
+
+        Ham .txt loglar yine de sunucunun logs/ klasöründe (yerelde) durur — özet Excel
+        üretimi ve arşiv için. Excel üretimi + yükleme arka plan thread'inde yapılır
+        (matplotlib yavaş olabilir; HTTP yanıtını bloke etmesin)."""
         if not file_path:
             return
         dev = self.session.get("device", {})
         node_name = node_log_folder(node_id, self.config)
         test_type = ftp_service.test_type_from_filename(os.path.basename(file_path))
+
+        # Ping ham logları ve tanınmayan/yük-basıcı loglar FTP'ye gitmez (yerelde kalır).
+        if test_type not in ("Wifi", "Iperf"):
+            return
+
         target = ftp_service.build_target_dir(
             dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
 
         def _work():
-            """Log dosyasını FTP hedef klasörüne yükler (arka plan thread hedefi)."""
-            files = [file_path]
-            try:
-                if test_type == "Ping":
-                    xlsx = excel_service.ping_log_to_excel(file_path)
-                    if xlsx:
-                        files.append(xlsx)
-                elif test_type == "Wifi":
+            """Wifi ise Excel'i üretip onu, Iperf ise .txt'yi FTP'ye yükler (thread hedefi)."""
+            if test_type == "Wifi":
+                try:
                     xlsx = excel_service.wifi_log_to_excel(file_path)
-                    if xlsx:
-                        files.append(xlsx)
-            except Exception as e:
-                print(f"[ORCH] {test_type} Excel uretilemedi: {e}")
-            ftp_service.upload_files_to_ftp(files, target)
+                except Exception as e:
+                    print(f"[ORCH] Wifi Excel uretilemedi: {e}")
+                    xlsx = None
+                if not xlsx:
+                    return                       # Excel çıkmadıysa ham .txt'yi FTP'ye koyma
+                ftp_service.upload_files_to_ftp([xlsx], target)
+            else:                                # Iperf
+                ftp_service.upload_files_to_ftp([file_path], target)
 
         threading.Thread(target=_work, daemon=True).start()
 
@@ -433,7 +444,8 @@ class Orchestrator:
     def _run_server_local(self, session_id: str, roles: list, params: TestParams):
         """Sunucunun kendi rollerini in-process thread'lerde koşar."""
         # Sunucunun kendi logları da bilgisayar klasörü altına (logs/LINUX/<session>)
-        log_dir = os.path.join(LOGS_DIR, node_log_folder("server", self.config), session_id)
+        server_name = node_log_folder("server", self.config)
+        log_dir = os.path.join(LOGS_DIR, server_name, session_id)
         for test in roles:
             runner = get_runner(test)
             if runner is None:
@@ -447,6 +459,7 @@ class Orchestrator:
                     progress=lambda p, s, m, _t=t: self.update_progress("server", _t, p, s, m),
                     stop=self._server_stop,
                     result=lambda kind, stats: self.record_result("server", kind, stats),
+                    node_name=server_name,
                 )
                 try:
                     logs = fn(params, ctx) or []

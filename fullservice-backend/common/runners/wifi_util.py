@@ -8,10 +8,11 @@ olarak çağrılır; ham veriler metin log dosyasına eklenir.
 
 Orijinal yazar: samet (2023-03-03)
 
-NOT (FULL Servis): Bu dosya GRK'daki functionBase_wifi.py'nin BİREBİR AYNISIDIR.
-Yalnızca CLI'a özel initialIO() ve onun pyfiglet bağımlılığı çıkarıldı; ölçüm/parse/
-yazma fonksiyonları (readWlan, getSignalInfo, getSystemInfo, getOneTimeInfo,
-getPeriodicData, createFileName) hiç değiştirilmeden korundu.
+NOT (FULL Servis): Bu dosya GRK'daki functionBase_wifi.py'yi temel alır. CLI'a özel
+initialIO()/pyfiglet çıkarıldı. TEK İŞLEVSEL FARK: GERÇEK BSSID desteği — GRK'da (ve
+eski FULL Servis'te) BSSID hep 00:00:00:00:00:00 geliyordu çünkü netsh/system_profiler
+onu gizliyor. Burada gerçek BSSID OS Wi-Fi API'sinden çekilir (get_wifi_bssid;
+Windows WlanApi / macOS airport-wdutil). GRK koduna DOKUNULMADI (kullanıcı isteri).
 """
 
 # %%
@@ -98,6 +99,162 @@ def readWlan():
         shellOutput = subprocess.run(cmd, capture_output=True, text=True, creationflags=NO_WINDOW).stdout
         return shellOutput.split("\n")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GERÇEK BSSID (FULL Servis eki — GRK'da yoktu, BSSID hep 00:00:.. geliyordu)
+#
+# Sorun: netsh (Windows 11 22H2+) ve system_profiler (macOS) bağlı AP'nin BSSID'ini
+# gizlilik gereği GİZLİYOR/redakte ediyor. Bu yüzden metin çıktısından gerçek BSSID
+# çıkmaz. Çözüm: işletim sisteminin Wi-Fi API'sini doğrudan sorgulamak.
+#   • Windows: Native Wifi API (wlanapi.dll) → WLAN_CONNECTION_ATTRIBUTES.dot11Bssid
+#   • macOS  : airport -I (varsa) → wdutil info (sudo gerekebilir)
+# Hiçbiri gerçek değer veremezse "" döner ve çağıran eski (redakte) değeri korur.
+#
+# NOT: En yeni OS sürümlerinde bu API'ler de KONUM İZNİ ister. Gerçek BSSID için:
+#   • Windows: Ayarlar → Gizlilik → Konum → açık + "Masaüstü uygulamaları erişebilsin"
+#   • macOS  : Sistem Ayarları → Gizlilik/Konum → Terminal/uygulamaya izin
+# ─────────────────────────────────────────────────────────────────────────────
+_BSSID_RE = re.compile(r"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$")
+
+
+def _looks_like_bssid(val) -> bool:
+    """Değer gerçek bir BSSID mi (6 hex çift, hepsi sıfır/broadcast DEĞİL)?"""
+    if not val:
+        return False
+    v = str(val).strip().lower()
+    if not _BSSID_RE.match(v):
+        return False
+    return v not in ("00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff")
+
+
+def _bssid_from_netsh() -> str:
+    """netsh çıktısındaki BSSID satırını okur (Konum kapalıysa redakte gelebilir)."""
+    try:
+        out = subprocess.run("netsh wlan show interfaces", capture_output=True,
+                             text=True, creationflags=NO_WINDOW).stdout
+        for line in out.split("\n"):
+            if "BSSID" in line:
+                val = ":".join(line.split(":")[1:]).strip()
+                if _looks_like_bssid(val):
+                    return val.lower()
+    except Exception:
+        pass
+    return ""
+
+
+def _bssid_windows() -> str:
+    """Windows: önce Native Wifi API (wlanapi.dll) ile gerçek BSSID; olmazsa netsh.
+    WlanApi, netsh'in redakte ettiği durumlarda çoğu sürümde gerçek BSSID'i verir."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        wlanapi = ctypes.windll.wlanapi
+
+        class GUID(ctypes.Structure):
+            _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
+                        ("Data3", wintypes.WORD), ("Data4", ctypes.c_ubyte * 8)]
+
+        class WLAN_INTERFACE_INFO(ctypes.Structure):
+            _fields_ = [("InterfaceGuid", GUID),
+                        ("strInterfaceDescription", wintypes.WCHAR * 256),
+                        ("isState", wintypes.DWORD)]
+
+        class WLAN_INTERFACE_INFO_LIST(ctypes.Structure):
+            _fields_ = [("dwNumberOfItems", wintypes.DWORD),
+                        ("dwIndex", wintypes.DWORD),
+                        ("InterfaceInfo", WLAN_INTERFACE_INFO * 8)]
+
+        class DOT11_SSID(ctypes.Structure):
+            _fields_ = [("uSSIDLength", wintypes.ULONG), ("ucSSID", ctypes.c_ubyte * 32)]
+
+        class WLAN_ASSOCIATION_ATTRIBUTES(ctypes.Structure):
+            _fields_ = [("dot11Ssid", DOT11_SSID),
+                        ("dot11BssType", wintypes.DWORD),
+                        ("dot11Bssid", ctypes.c_ubyte * 6),
+                        ("dot11PhyType", wintypes.DWORD),
+                        ("uDot11PhyIndex", wintypes.ULONG),
+                        ("wlanSignalQuality", wintypes.ULONG),
+                        ("ulRxRate", wintypes.ULONG),
+                        ("ulTxRate", wintypes.ULONG)]
+
+        class WLAN_SECURITY_ATTRIBUTES(ctypes.Structure):
+            _fields_ = [("bSecurityEnabled", wintypes.BOOL),
+                        ("bOneXEnabled", wintypes.BOOL),
+                        ("dot11AuthAlgorithm", wintypes.DWORD),
+                        ("dot11CipherAlgorithm", wintypes.DWORD)]
+
+        class WLAN_CONNECTION_ATTRIBUTES(ctypes.Structure):
+            _fields_ = [("isState", wintypes.DWORD),
+                        ("wlanConnectionMode", wintypes.DWORD),
+                        ("strProfileName", wintypes.WCHAR * 256),
+                        ("wlanAssociationAttributes", WLAN_ASSOCIATION_ATTRIBUTES),
+                        ("wlanSecurityAttributes", WLAN_SECURITY_ATTRIBUTES)]
+
+        handle = wintypes.HANDLE()
+        negotiated = wintypes.DWORD()
+        if wlanapi.WlanOpenHandle(2, None, ctypes.byref(negotiated), ctypes.byref(handle)) != 0:
+            return _bssid_from_netsh()
+        try:
+            p_list = ctypes.POINTER(WLAN_INTERFACE_INFO_LIST)()
+            if wlanapi.WlanEnumInterfaces(handle, None, ctypes.byref(p_list)) != 0:
+                return _bssid_from_netsh()
+            try:
+                lst = p_list.contents
+                for idx in range(lst.dwNumberOfItems):
+                    guid = lst.InterfaceInfo[idx].InterfaceGuid
+                    p_conn = ctypes.POINTER(WLAN_CONNECTION_ATTRIBUTES)()
+                    size = wintypes.DWORD()
+                    # 7 = wlan_intf_opcode_current_connection
+                    ret = wlanapi.WlanQueryInterface(handle, ctypes.byref(guid), 7, None,
+                                                     ctypes.byref(size),
+                                                     ctypes.byref(p_conn), None)
+                    if ret != 0 or not p_conn:
+                        continue
+                    try:
+                        b = p_conn.contents.wlanAssociationAttributes.dot11Bssid
+                        mac = ":".join("%02x" % x for x in b)
+                        if _looks_like_bssid(mac):
+                            return mac
+                    finally:
+                        wlanapi.WlanFreeMemory(p_conn)
+            finally:
+                wlanapi.WlanFreeMemory(p_list)
+        finally:
+            wlanapi.WlanCloseHandle(handle, None)
+    except Exception as e:
+        print(f"[WIFI] WlanApi BSSID alinamadi ({e}); netsh deneniyor.")
+
+    return _bssid_from_netsh()
+
+
+def _bssid_macos() -> str:
+    """macOS: airport -I (eski sürümlerde gerçek BSSID) → wdutil info (sudo gerekebilir)."""
+    airport = ("/System/Library/PrivateFrameworks/Apple80211.framework"
+               "/Versions/Current/Resources/airport")
+    for cmd in ([airport, "-I"], ["wdutil", "info"]):
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True).stdout
+        except Exception:
+            continue
+        for line in out.splitlines():
+            s = line.strip()
+            if s.upper().startswith("BSSID") and ":" in s:
+                val = s.split(":", 1)[1].strip()
+                if _looks_like_bssid(val):
+                    return val.lower()
+    return ""
+
+
+def get_wifi_bssid() -> str:
+    """Bağlı Wi-Fi AP'sinin GERÇEK BSSID'ini döner (bulunamazsa '')."""
+    try:
+        return _bssid_macos() if sys.platform == "darwin" else _bssid_windows()
+    except Exception as e:
+        print(f"[WIFI] BSSID alinamadi: {e}")
+        return ""
+
+
 def getSignalInfo(sheelOutput):
     """WLAN çıktı satırlarından BSSID, durum, sinyal, RX/TX hızı, kanal ve radyo tipini çıkarır.
 
@@ -122,12 +279,17 @@ def getSignalInfo(sheelOutput):
 
     theList = []
 
-    # BSSID (her iki dilde de ayni)
+    # BSSID (her iki dilde de ayni). netsh/system_profiler bunu redakte ediyorsa
+    # (00:00:.. ya da boş), gerçek BSSID'i OS Wi-Fi API'sinden çekeriz.
     bssid = ""
     for line in sheelOutput:
         if "BSSID" in line:
             bssid = ":".join(line.split(":")[1:]).strip()
             break
+    if not _looks_like_bssid(bssid):
+        real = get_wifi_bssid()
+        if real:
+            bssid = real
     theList.append(bssid)
 
     # State / Durum
@@ -221,10 +383,14 @@ def getOneTimeInfo(wlanInfo, filename):
             break
 
     log += ("\t\t\t\t\t\tBSSID: ")
+    bssid_hdr = ""
     for i in wlanInfo:
         if "BSSID" in i:
-            log += ":".join(i.split(":")[1:])
+            bssid_hdr = ":".join(i.split(":")[1:]).strip()
             break
+    if not _looks_like_bssid(bssid_hdr):
+        bssid_hdr = get_wifi_bssid() or bssid_hdr
+    log += bssid_hdr
 
     log += "\n\n\t\t\t\t\t\t******************************************\n"
 

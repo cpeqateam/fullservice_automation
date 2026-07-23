@@ -143,13 +143,23 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
 - [`server/notify.py`](fullservice-backend/server/notify.py) +
   [`email_sender.py`](fullservice-backend/server/email_sender.py) +
   [`notification_service.py`](fullservice-backend/server/notification_service.py) —
-  **Bildirim.** Telegram (mesaj + özet log dosyaları) ve mail (sadece mesaj). GRK ile
+  **Bildirim.** Telegram (mesaj + ÖZET dosyalar) ve mail (sadece mesaj). GRK ile
   birebir. Test bitince `send_completion` çağrılır. Sırlar `get_secret`'tan gelir.
+  Telegram'a yalnızca `.xlsx` (ping özet + wifi analiz) ve `iperf` `.txt` gider
+  (`_telegram_attachments`); ham loglar FTP + `logs/` içinde kalır. Bu worker aynı
+  zamanda `report_service.build_ping_summaries`'i tetikler.
 - [`server/log_capture.py`](fullservice-backend/server/log_capture.py) — **error_log.**
   `logs/app.log`'un oturum dilimini kesip `FULL_Service_errorlog_<...>.log` olarak
   FTP'ye yükler (bildirim YOK).
-- [`server/excel_service.py`](fullservice-backend/server/excel_service.py) — Ping/Wifi
-  için Excel üretir (başka oturumda eklendi).
+- [`server/excel_service.py`](fullservice-backend/server/excel_service.py) — Excel üretimi
+  (GRK ile birebir isimlendirme + araya bilgisayar adı). Wifi: log başına bir Excel
+  (`wifi_log_to_excel`, adı ham logdan türer → bilgisayar adı zaten içinde). Ping: log
+  başına DEĞİL, **bilgisayar başına tek özet** (`ping_summary_excel`, GRK `merge_parser`
+  portu — modem+internet, IPv4/IPv6 tek dosyada; `FULL_Service_ping_ozet_<BILGISAYAR>_...`).
+- [`server/report_service.py`](fullservice-backend/server/report_service.py) — Oturum
+  sonunda her bilgisayarın `logs/<BILGISAYAR>/<session>/*ping*.txt` loglarını birleştirip
+  ping özet Excel'i üretir ve FTP `.../FULLSERVIS/Ping/<BILGISAYAR>/` altına yükler.
+  4 ping makinesi → 4 özet Excel.
 - [`server/log_collector.py`](fullservice-backend/server/log_collector.py) —
   Agent'lardan gelen log dosyalarını `logs/<BILGISAYAR>/<session>/` altına yazar.
 
