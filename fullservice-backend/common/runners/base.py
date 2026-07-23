@@ -39,8 +39,12 @@ ProgressCb = Callable[[float, str, str], None]
 #   kind: "ping" | "iperf" | "wifi"   stats: teste özgü alanları içeren dict
 ResultCb = Callable[[str, dict], None]
 
-# Log dosyası adlandırma — GRK ile AYNI standart; tek fark 'grk' yerine 'FULL_Service'.
-PROJECT_TAG = "FULL_Service"
+# Log dosyası adlandırma — FULL Servis kendi standardı (camelCase):
+#     fullServis_<testName>_<nodeName>_<marka>_<model>_<fw>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
+# Sabit alanlar (önek, testName, nodeName) küçük harf + bileşikse camelCase
+# (fullServis, wifiAnaliz, pingOzet, iperfServer, macWifi, macEth, winWifi, linux).
+# Marka/model/fw gerçek cihaz değerleridir; olduğu gibi korunur.
+PROJECT_TAG = "fullServis"
 
 
 def _name_part(s) -> str:
@@ -48,26 +52,38 @@ def _name_part(s) -> str:
     return (str(s).strip() if s is not None else "") .replace(" ", "") or "Unknown"
 
 
+def _camel_node(name) -> str:
+    """nodeName'i camelCase'e çevirir: 'MAC_ETH'→'macEth', 'WIN_WIFI'→'winWifi',
+    'LINUX'→'linux'. '_' veya '-' ile bölünür; ilk parça küçük, sonrakiler baş harfi
+    büyük. Zaten camelCase verilmişse (tek parça) küçük harfe çevrilmez, olduğu gibi kalır."""
+    raw = str(name or "").replace("-", "_")
+    parts = [p for p in raw.split("_") if p]
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        # 'LINUX'→'linux'; ama 'macWifi' gibi zaten camelCase geldiyse bozmayalım
+        return parts[0].lower() if parts[0].isupper() else parts[0]
+    return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
+
+
 def grk_style_filename(kind: str, brand, model, firmware, *extras,
                        client: str | None = None, ext: str = "txt") -> str:
-    """GRK isimlendirmesinin birebir aynısı (grk → FULL_Service), TEK farkla: FULL Servis
-    dağıtık olduğu için isme bir de CLIENT (bilgisayar) adı girer — hangi makineye ait
-    olduğu dosya adından anlaşılsın. Client, GRK'nın tek-makineli isminde olmayan tek
-    ek alandır ve test tipinden hemen sonra, marka'dan önce yerleşir:
+    """FULL Servis log/rapor dosya adı standardı (camelCase):
 
-       FULL_Service_<kind>_<CLIENT>_<brand>_<model>_<firmware>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
+       fullServis_<testName>_<nodeName>_<marka>_<model>_<fw>[_<extra>...]_<YYYYMMDD_HHMMSS>.<ext>
 
-    GRK karşılıkları:
-       grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
-         → FULL_Service_ping_<CLIENT>_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
-       grk_wifiAnaliz_<brand>_<model>_<fw>_54sn_<ts>.txt
-         → FULL_Service_wifiAnaliz_<CLIENT>_<brand>_<model>_<fw>_54sn_<ts>.txt
+    Örnekler:
+       fullServis_ping_macWifi_ZYXEL_EX5601_v1_IPv4_8888_<ts>.txt
+       fullServis_wifiAnaliz_winWifi_ZYXEL_EX5601_v1_54sn_<ts>.txt
+       fullServis_pingOzet_linux_ZYXEL_EX5601_v1_<ts>.xlsx
 
-    client verilmezse (nadiren) GRK ile birebir aynı, ek alansız isim üretilir."""
+    nodeName (client) camelCase'e çevrilir (_camel_node). client verilmezse o alan atlanır.
+    testName (kind) çağıran tarafından camelCase verilir (ping/iperf/wifiAnaliz/iperfServer/
+    pingOzet). Marka/model/fw gerçek cihaz değerleridir, olduğu gibi yazılır."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     parts = [PROJECT_TAG, kind]
     if client:
-        parts.append(_name_part(client))
+        parts.append(_camel_node(client))
     parts += [_name_part(brand), _name_part(model), _name_part(firmware)]
     parts += [str(e) for e in extras if e not in (None, "")]
     parts.append(ts)
@@ -101,12 +117,10 @@ class RunContext:
         return os.path.join(self.log_dir, fname)
 
     def grk_log_path(self, kind: str, brand, model, firmware, *extras, ext: str = "txt") -> str:
-        """GRK ile AYNI isimlendirme standardında log dosyası yolu üretir; iki fark:
-        baştaki 'grk' yerine 'FULL_Service', ve test tipinden sonra bu makinenin
-        CLIENT adı (node_name). Örnek:
-          GRK   : grk_ping_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
-          BURADA: FULL_Service_ping_<CLIENT>_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
-        kind  : "ping" | "wifiAnaliz" | "iperf" | "youtube" | "torrent" | ...
+        """FULL Servis standardında log dosyası yolu üretir (camelCase):
+          fullServis_<kind>_<nodeName>_<brand>_<model>_<fw>_<extras>_<ts>.<ext>
+        Örn: fullServis_ping_macWifi_<brand>_<model>_<fw>_IPv4_8888_<ts>.txt
+        kind  : "ping" | "wifiAnaliz" | "iperf" | "iperfServer" | "youtube" | "torrent"
         extras: kind'e özgü ek parçalar (topotype, ip, '<sn>sn' vb.)"""
         client = self.node_name or (self.node_id or "").upper() or None
         fname = grk_style_filename(kind, brand, model, firmware, *extras, client=client, ext=ext)

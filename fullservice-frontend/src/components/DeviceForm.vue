@@ -248,6 +248,17 @@ function onStart() {
     snack.show = true
     return
   }
+  // Uptime kontrolü: bir cihaz limitten uzun süredir açıksa (kırmızı) test başlatılamaz.
+  const blocked = appStore.uptimeBlockedNodes
+  if (blocked.length) {
+    const fmt = (m) => (m < 60 ? `${m} dakika` : `${Math.floor(m / 60)} sa ${m % 60} dk`)
+    const list = blocked.map((b) => `${b.label} (${fmt(b.minutes)}dır açık)`).join('; ')
+    snack.text = `Test başlatılamaz. ${list} — bu cihaz(lar)ı kapatıp yeniden açın. `
+      + 'Sağ panelde hepsi yeşil olunca başlatabilirsiniz.'
+    snack.color = 'error'
+    snack.show = true
+    return
+  }
   confirmDialog.value = true
 }
 

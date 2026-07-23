@@ -48,6 +48,7 @@ export const useAppStore = defineStore('app', {
     nodes:       [],
     testLabels:  {},
     serverLanIp: null,
+    uptimeLimitMin: 45,   // bir cihaz bu kadar dakikadan uzun açıksa kırmızı → test engellenir
 
     // Polling kontrolü
     connected:    false,
@@ -99,6 +100,18 @@ export const useAppStore = defineStore('app', {
       }
       return { total, completed, running, error, avg: total ? Math.round(sum / total) : 0 }
     },
+    // Uptime limitini AŞAN online cihazlar (kırmızı) — test başlatmayı engeller.
+    // [{ label, minutes }]. Boşsa hepsi süre açısından uygun.
+    uptimeBlockedNodes: (s) => {
+      const now = Date.now()
+      const out = []
+      for (const n of s.nodes) {
+        if (!n.online || !n.agent_started_at) continue
+        const mins = Math.floor((now - new Date(n.agent_started_at).getTime()) / 60000)
+        if (mins >= s.uptimeLimitMin) out.push({ label: n.label, minutes: mins })
+      }
+      return out
+    },
   },
 
   actions: {
@@ -109,6 +122,7 @@ export const useAppStore = defineStore('app', {
         this.nodes       = data.nodes       || []
         this.testLabels  = data.test_labels || {}
         this.serverLanIp = data.server_lan_ip || null
+        if (data.uptime_limit_min) this.uptimeLimitMin = data.uptime_limit_min
         this.connected   = true
       } catch (e) {
         this.connected = false

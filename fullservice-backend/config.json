@@ -9,6 +9,9 @@
 
   "agent_port": 7531,
 
+  "_uptime_limit_aciklama": "Bir cihaz bu kadar DAKIKADAN uzun suredir aciksa panelde KIRMIZI gorunur ve test BASLATILAMAZ (cihazin yeniden baslatilmasi gerekir). Yesil/kirmizi esigi de budur.",
+  "uptime_limit_minutes": 45,
+
   "network": {
     "_aciklama": "Yerel statik IP plani. provisioning/ altindaki scriptler bu bolumu okur. IP'leri kendi laboratuvarinizdaki LAN semasina gore guncelleyin.",
     "subnet_mask": "255.255.255.0",

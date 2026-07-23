@@ -223,7 +223,7 @@ def ping_summary_excel(txt_paths: list[str], node_name: str,
         return None
 
     from common.runners.base import grk_style_filename
-    fname = grk_style_filename("ping_ozet", brand, model, firmware, client=node_name, ext="xlsx")
+    fname = grk_style_filename("pingOzet", brand, model, firmware, client=node_name, ext="xlsx")
     out_path = os.path.join(out_dir or os.path.dirname(valid[0]), fname)
     start_ts = test_start_time or datetime.now()
     if isinstance(start_ts, str):

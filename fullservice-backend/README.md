@@ -58,14 +58,15 @@ fullservice-backend/
 │   ├── main.py              #   /start, /stop, /health + registration loop
 │   └── test_executor.py     #   thread'li runner yürütücüsü + push/upload + /api/result
 └── server/                  # Linux orkestratör (FastAPI)
-    ├── main.py              #   tüm /api/* endpoint'leri + stdout→app.log Tee
-    ├── orchestrator.py      #   registry + aggregator + fan-out + yerel testler
+    ├── main.py              #   tüm /api/* endpoint'leri + stdout→app.log Tee + uptime kilidi
+    ├── orchestrator.py      #   registry + aggregator + fan-out + yerel testler + check_uptime
     ├── auth_service.py      #   login (cpeteam varsayılan + grk_users)
     ├── db_service.py        #   sonuçları copy_ tablolarına yazar
-    ├── ftp_service.py       #   logları FTP klasör yapısına yükler
-    ├── notify.py / email_sender.py / notification_service.py  # Telegram + mail bildirimi
+    ├── ftp_service.py       #   rapor dosyalarını FTP klasör yapısına yükler
+    ├── notify.py / email_sender.py / notification_service.py  # Telegram (tek ZIP) + mail
     ├── log_capture.py       #   error_log dilimi → FTP
-    ├── excel_service.py     #   Ping/Wifi için Excel
+    ├── excel_service.py     #   wifi Excel + bilgisayar başına ping özet Excel
+    ├── report_service.py    #   oturum sonu: her bilgisayar için ping özeti → FTP
     └── log_collector.py     #   yüklenen logları logs/<node>/<session>/ altına yazar
 ```
 

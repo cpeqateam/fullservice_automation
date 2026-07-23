@@ -14,6 +14,21 @@ Biçim [Keep a Changelog](https://keepachangelog.com/tr/), sürümleme
 ### Eklendi
 - Formal `CHANGELOG.md` (eski `GELISTIRME_GUNLUGU.md` bunun yerine geçti).
 - Backend genelinde eksik **docstring**'ler tamamlandı (modül/sınıf/fonksiyon).
+- **Telegram'a tek ZIP**: test bitince tüm rapor dosyaları (ping özet + wifi analiz
+  Excel'leri + iperf txt) tek `fullServis_raporlar_<marka>_<model>_<fw>_<ts>.zip` içinde
+  gönderilir (tek tek dosya yerine). 50 MB kontrolü zip üzerinde.
+- **Uptime kilidi**: bir cihaz `uptime_limit_minutes` (config.json, varsayılan 45 dk)
+  süresinden uzundur açıksa panelde KIRMIZI görünür ve **test başlatılamaz**. Backend
+  `POST /api/session/start` 409 + açıklayıcı mesaj döner (`orchestrator.check_uptime`);
+  frontend ayrıca başlatmadan önce uyarır. Limit `/api/state` ile paylaşılır (tek kaynak).
+
+### Değişti
+- **Log/rapor isimlendirmesi FULL Servis camelCase standardına geçti**:
+  `fullServis_<testName>_<nodeName>_<marka>_<model>_<fw>[_<extra>]_<ts>.<ext>`.
+  Önek `FULL_Service` → `fullServis`; nodeName camelCase (`macWifi`/`macEth`/`winWifi`/
+  `linux`); testName camelCase (`wifiAnaliz`/`iperfServer`/`pingOzet`). Marka/model/fw
+  gerçek cihaz değerleri olarak korunur. Örn:
+  `fullServis_ping_macWifi_ZYXEL_EX5601_v1_IPv4_8888_<ts>.txt`.
 - **Bilgisayar başına ping özet Excel'i** (`server/report_service.py` +
   `excel_service.ping_summary_excel`, GRK `merge_parser` portu): her makinenin modem +
   internet, IPv4/IPv6 tüm ping logları TEK özet Excel'de birleşir (Statistics + Graphs +

@@ -41,6 +41,9 @@ class Orchestrator:
         self.config = config
         self.defaults = config.get("defaults", {})
         self.server_lan_ip = config.get("server", {}).get("lan_ip") or detect_lan_ip()
+        # Uptime limiti (dakika): bir cihaz bu süreden uzundur açıksa "kırmızı" sayılır
+        # ve test BAŞLATILAMAZ (yeniden başlatılmalı). config.json'dan okunur.
+        self.uptime_limit_min = int(config.get("uptime_limit_minutes", 45))
         self._lock = threading.RLock()
 
         try:
@@ -189,8 +192,32 @@ class Orchestrator:
                 "session": dict(self.session),
                 "test_labels": TEST_LABELS,
                 "server_lan_ip": self.server_lan_ip,
+                "uptime_limit_min": self.uptime_limit_min,
                 "nodes": [self._node_view(n) for n in self.nodes.values()],
             }
+
+    def check_uptime(self) -> list[dict]:
+        """Uptime limitini AŞAN online düğümleri döner: [{'label','node_id','minutes'}].
+        Boş liste → tüm cihazlar limit altında (yeşil), test başlatılabilir. Bir cihaz
+        limit üstündeyse (kırmızı) test başlatılmamalı — çağıran engeller."""
+        now = datetime.now()
+        blocked = []
+        with self._lock:
+            for node in self.nodes.values():
+                view = self._node_view(node)
+                if not view["online"]:
+                    continue                       # kapalı/erişilemez cihaz uptime'la engellemez
+                started = view.get("agent_started_at")
+                if not started:
+                    continue
+                try:
+                    mins = int((now - datetime.fromisoformat(started)).total_seconds() // 60)
+                except Exception:
+                    continue
+                if mins >= self.uptime_limit_min:
+                    blocked.append({"label": view["label"], "node_id": view["node_id"],
+                                    "minutes": mins})
+        return blocked
 
     def _node_view(self, node: dict) -> dict:
         """Bir düğümün dashboard için sunulan görünümünü üretir (heartbeat 30 sn'den eskiyse offline)."""

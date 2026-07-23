@@ -146,16 +146,17 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
   **Bildirim.** Telegram (mesaj + ÖZET dosyalar) ve mail (sadece mesaj). GRK ile
   birebir. Test bitince `send_completion` çağrılır. Sırlar `get_secret`'tan gelir.
   Telegram'a yalnızca `.xlsx` (ping özet + wifi analiz) ve `iperf` `.txt` gider
-  (`_telegram_attachments`); ham loglar FTP + `logs/` içinde kalır. Bu worker aynı
-  zamanda `report_service.build_ping_summaries`'i tetikler.
+  (`_telegram_attachments`), hepsi **tek ZIP**'te (`fullServis_raporlar_...zip`); ham
+  loglar FTP + `logs/` içinde kalır. Bu worker aynı zamanda
+  `report_service.build_ping_summaries`'i tetikler.
 - [`server/log_capture.py`](fullservice-backend/server/log_capture.py) — **error_log.**
   `logs/app.log`'un oturum dilimini kesip `FULL_Service_errorlog_<...>.log` olarak
   FTP'ye yükler (bildirim YOK).
 - [`server/excel_service.py`](fullservice-backend/server/excel_service.py) — Excel üretimi
-  (GRK ile birebir isimlendirme + araya bilgisayar adı). Wifi: log başına bir Excel
+  (FULL Servis camelCase isimlendirme + araya bilgisayar adı). Wifi: log başına bir Excel
   (`wifi_log_to_excel`, adı ham logdan türer → bilgisayar adı zaten içinde). Ping: log
   başına DEĞİL, **bilgisayar başına tek özet** (`ping_summary_excel`, GRK `merge_parser`
-  portu — modem+internet, IPv4/IPv6 tek dosyada; `FULL_Service_ping_ozet_<BILGISAYAR>_...`).
+  portu — modem+internet, IPv4/IPv6 tek dosyada; `fullServis_pingOzet_<nodeName>_...xlsx`).
 - [`server/report_service.py`](fullservice-backend/server/report_service.py) — Oturum
   sonunda her bilgisayarın `logs/<BILGISAYAR>/<session>/*ping*.txt` loglarını birleştirip
   ping özet Excel'i üretir ve FTP `.../FULLSERVIS/Ping/<BILGISAYAR>/` altına yükler.
@@ -197,9 +198,12 @@ boolean bayrak (`AtomicBoolean` gibi); `.set()` = true yap, `.is_set()` = oku.
   ```
   - `base.py` → `RunContext` (log klasörü + stop bayrağı + progress callback) +
     görünür terminal yardımcıları (`open_terminal_running`, `open_log_viewer`).
-  - `ping_runner.py`, `youtube_runner.py`(+`youtube_util.py`), `iperf_runner.py`,
-    `iperf_server_runner.py`, `torrent_runner.py`(+`torrent_util.py`),
-    `wifi_track_runner.py`(+`wifi_util.py`/`wifi_util_mac.py`).
+  - `ping_runner.py`, `youtube_runner.py`(+`youtube_util.py` — tam ekran AÇMAZ, log
+    ÜRETMEZ), `iperf_runner.py`, `iperf_server_runner.py`, `torrent_runner.py`
+    (+`torrent_util.py` — log ÜRETMEZ), `wifi_track_runner.py`(+`wifi_util.py`/
+    `wifi_util_mac.py` — **gerçek BSSID** OS Wi-Fi API'sinden: `get_wifi_bssid`).
+  - Dosya adı standardı `base.py` → `grk_log_path`/`grk_style_filename`:
+    `fullServis_<testName>_<nodeName>_<marka>_<model>_<fw>[_<extra>]_<ts>` (camelCase).
   - `registry.py` → `"test adı" → run fonksiyonu` sözlüğü (Java'da `Map<String,
     Runner>` veya bir factory). Yeni test eklemek = runner yaz + buraya 1 satır.
 
@@ -224,6 +228,8 @@ fonksiyonu doğrudan parametre olarak geçiyoruz.
 ## 4. Bir testin baştan sona yolu (uçtan uca)
 
 1. **Dashboard** "Başlat" → `POST /api/session/start` (`server/main.py`).
+   Önce **uptime kilidi**: `orchestrator.check_uptime()` — bir cihaz `uptime_limit_minutes`
+   (config, varsayılan 45 dk) üstündeyse (panelde kırmızı) **409** döner, test başlamaz.
 2. `orchestrator.start_session()` → `TestParams` hazırlar, kendi (sunucu) rollerini
    in-process thread'lerde başlatır, **diğer düğümlere** `POST /start` atar.
 3. Her agent (`test_executor.py`) komuttaki testleri thread'lerde koşar →
@@ -233,7 +239,12 @@ fonksiyonu doğrudan parametre olarak geçiyoruz.
    barı doldurur.
 5. Test bitince runner log dosyası yolunu döner → agent `POST /api/logs/upload` ile
    sunucuya yükler → `log_collector` `logs/<BILGISAYAR>/<session>/` altına yazar.
-6. "Durdur" → `ctx.stop.set()` → runner döngüleri `if ctx.stop.is_set(): return`
+   (youtube/torrent log ÜRETMEZ → yüklenmez.) FTP'ye yalnızca wifi Excel + iperf txt gider.
+6. Ölçüm testleri (ping/iperf/wifi) bitince (`_on_session_complete`): her bilgisayar için
+   **ping özet Excel** üretilir (`report_service`), rapor dosyaları (ping özet + wifi Excel +
+   iperf txt) **tek ZIP**'te Telegram'a + mail (yalnız metin) gönderilir. DB'ye ping/wifi/iperf
+   özetleri yazılır.
+7. "Durdur" → `ctx.stop.set()` → runner döngüleri `if ctx.stop.is_set(): return`
    ile temiz çıkar.
 
 ---

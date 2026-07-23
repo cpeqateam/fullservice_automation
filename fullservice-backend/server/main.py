@@ -160,9 +160,30 @@ def state():
     return orch.get_state()
 
 
+def _fmt_uptime(mins: int) -> str:
+    """Dakikayı okunur süreye çevirir: 52 → '52 dakika', 75 → '1 sa 15 dk'."""
+    if mins < 60:
+        return f"{mins} dakika"
+    return f"{mins // 60} sa {mins % 60} dk"
+
+
 @app.post("/api/session/start")
 def session_start(req: SessionStartRequest):
-    """FULL Servis testini başlatır — override'ları alıp tüm düğümlere fan-out eder."""
+    """FULL Servis testini başlatır — override'ları alıp tüm düğümlere fan-out eder.
+    ÖNCE uptime kontrolü: bir cihaz limitten uzun süredir açıksa (kırmızı) 409 döner,
+    test başlatılmaz; kullanıcı o cihazı yeniden başlatmalı."""
+    blocked = orch.check_uptime()
+    if blocked:
+        cihazlar = "; ".join(f"{b['label']} ({_fmt_uptime(b['minutes'])}dır açık)" for b in blocked)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Test başlatılamaz. Şu cihaz(lar) {orch.uptime_limit_min} dakikadan uzun "
+                f"süredir açık ve yeniden başlatılması gerekiyor: {cihazlar}. "
+                f"İlgili cihaz(lar)ı kapatıp uygulamaya yeniden çift tıklayın; sağ paneldeki "
+                f"tüm cihazlar yeşil olunca testi başlatabilirsiniz."
+            ),
+        )
     overrides = req.dict() if hasattr(req, "dict") else req.model_dump()
     overrides = {k: v for k, v in overrides.items() if v is not None}
     result = orch.start_session(overrides)

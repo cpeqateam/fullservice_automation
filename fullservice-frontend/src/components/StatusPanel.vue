@@ -169,7 +169,8 @@ function uptimeText(n) {
 function uptimeClass(n) {
   const m = uptimeMinutes(n)
   if (m === null) return ''
-  return m >= 45 ? 'uptime-warn' : 'uptime-ok'
+  // Limit backend'den gelir (config.json → uptime_limit_minutes); aşılırsa kırmızı.
+  return m >= appStore.uptimeLimitMin ? 'uptime-warn' : 'uptime-ok'
 }
 
 function onHealthCheck() {

@@ -10,8 +10,9 @@ Telegram'a NE gider (kullanıcı isteri — ham .txt yığını gönderilmez):
   • Ping özet Excel'leri     (bilgisayar başına tek dosya, adı bilgisayarı içerir)
   • Wi-Fi analiz Excel'leri  (bilgisayar başına, adı bilgisayarı içerir)
   • iperf .txt raporları
-Diğer ham loglar (ping/youtube/torrent/wifi .txt) yalnızca FTP'ye ve sunucunun
-logs/ klasörüne yazılır, Telegram'a gönderilmez.
+Bunların HEPSİ TEK BİR ZIP'te toplanıp öyle gönderilir (fullServis_raporlar_...zip)
+— Telegram tek tek dosyaya boğulmasın. Diğer ham loglar (ping/youtube/torrent/wifi
+.txt) yalnızca FTP'ye ve sunucunun logs/ klasörüne yazılır, Telegram'a gönderilmez.
 
 Tetikleme: orchestrator.stop_session() — test bitince (kullanıcı "Durdur" dediğinde)
 arka planda çağrılır. Agent log upload'larının tamamlanması için kısa bir bekleme
@@ -22,8 +23,10 @@ Devre dışı: ortam değişkeni FS_NOTIFY_DISABLE=1.
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
 import time
+import zipfile
 from datetime import datetime
 from typing import List, Optional
 
@@ -115,10 +118,37 @@ def _telegram_attachments(paths: List[str]) -> List[str]:
     return sorted(keep)
 
 
+def _zip_reports(paths: List[str], device: dict) -> Optional[str]:
+    """Telegram'a gidecek rapor dosyalarını (Excel + iperf) TEK bir .zip'te toplar.
+    Zip yolunu döner; dosya yoksa None. Zip adı FULL Servis standardında:
+        fullServis_raporlar_<marka>_<model>_<fw>_<YYYYMMDD_HHMMSS>.zip
+    (kullanıcı isteri: Telegram'a tek tek dosya değil, tek zip gitsin)."""
+    files = [p for p in (paths or []) if p and os.path.exists(p)]
+    if not files:
+        return None
+
+    def _np(s):
+        return (str(s).strip() if s else "").replace(" ", "") or "Unknown"
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = (f"fullServis_raporlar_{_np(device.get('brand'))}_{_np(device.get('model'))}"
+            f"_{_np(device.get('firmware'))}_{ts}.zip")
+    zip_path = os.path.join(tempfile.gettempdir(), name)
+    try:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in files:
+                zf.write(p, os.path.basename(p))   # arşivde düz dosya adı (klasörsüz)
+        print(f"[NOTIFY] {len(files)} rapor tek zip'te toplandi: {name}")
+        return zip_path
+    except Exception as e:
+        print(f"[NOTIFY] Zip olusturulamadi: {e}")
+        return None
+
+
 def _worker(device: dict, session_id: str, start_time):
     """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) bilgisayar başına ping
-    özet Excel'lerini üretir, oturumun dosyalarını toplayıp süzer, tamamlanma metnini kurup
-    mail (metin) + Telegram (metin + Excel/iperf dosyaları) gönderir."""
+    özet Excel'lerini üretir, oturumun rapor dosyalarını süzüp TEK ZIP yapar, tamamlanma
+    metnini kurup mail (metin) + Telegram (metin + tek zip) gönderir."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
 
@@ -132,14 +162,22 @@ def _worker(device: dict, session_id: str, start_time):
     end_time = datetime.now()
     body = _build_body(device, start_time, end_time)
 
-    logs = []
+    # Süzülmüş rapor dosyalarını (Excel + iperf) tek zip'te topla
+    zip_path = None
     try:
-        logs = _telegram_attachments(log_collector.list_session_files(session_id))
+        attachments = _telegram_attachments(log_collector.list_session_files(session_id))
+        zip_path = _zip_reports(attachments, device)
     except Exception as e:
-        print(f"[NOTIFY] Log dosyalari toplanamadi: {e}")
+        print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
 
     _send_email(body)             # mail: yalnızca metin (dosyasız)
-    _send_telegram(body, logs)    # telegram: metin + süzülmüş dosyalar (Excel + iperf)
+    _send_telegram(body, zip_path)  # telegram: metin + TEK zip
+    # Gönderim sonrası geçici zip'i temizle
+    if zip_path:
+        try:
+            os.remove(zip_path)
+        except OSError:
+            pass
 
 
 def _send_email(body: str):
@@ -157,34 +195,35 @@ def _send_email(body: str):
         print(f"[NOTIFY] Mail gonderim hatasi: {e}")
 
 
-def _send_telegram(body: str, logs: List[str]):
-    """Tamamlanma metnini Telegram grubuna, ardından özet log dosyalarını gönderir
-    (50 MB üstü dosyalar gönderilmez, yerine uyarı mesajı atılır)."""
+def _send_telegram(body: str, zip_path: Optional[str]):
+    """Tamamlanma metnini Telegram grubuna, ardından TEK rapor zip'ini gönderir
+    (50 MB üstü ise gönderilmez, yerine uyarı mesajı atılır — dosyalar FTP + logs/'ta var)."""
     try:
         notify.send_telegram(body)
-        for path in (logs or []):
-            basename = os.path.basename(path)
+        if not zip_path or not os.path.exists(zip_path):
+            print("[NOTIFY] Gonderilecek rapor zip'i yok (yalniz metin gonderildi).")
+            return
+        basename = os.path.basename(zip_path)
+        try:
+            size = os.path.getsize(zip_path)
+        except OSError:
+            size = 0
+        if size > TELEGRAM_DOC_LIMIT:
+            msg = (
+                f"⚠️ <b>{basename}</b> {size / 1024 / 1024:.1f} MB — Telegram 50 MB "
+                f"sinirini astigi icin gonderilemedi.\nRaporlar FTP sunucusunda ve "
+                f"sunucunun <code>logs/</code> klasorunde mevcut."
+            )
+            print(f"[NOTIFY] Zip cok buyuk ({size} byte), Telegram'a yuklenmiyor.")
             try:
-                size = os.path.getsize(path)
-            except OSError:
-                size = 0
-            if size > TELEGRAM_DOC_LIMIT:
-                msg = (
-                    f"⚠️ <b>{basename}</b> dosyasi {size / 1024 / 1024:.1f} MB — "
-                    f"Telegram 50 MB sinirini astigi icin gonderilemedi.\n"
-                    f"Dosya FTP sunucusuna ve sunucunun <code>logs/</code> klasorune "
-                    f"yine de yazildi."
-                )
-                print(f"[NOTIFY] {basename} cok buyuk ({size} byte), Telegram'a yuklenmiyor.")
-                try:
-                    notify.send_telegram(msg)
-                except Exception as e:
-                    print(f"[NOTIFY] Buyuk-dosya uyarisi gonderilemedi: {e}")
-                continue
-            try:
-                notify.send_document(path, caption=f"[DOSYA] {basename}")
+                notify.send_telegram(msg)
             except Exception as e:
-                print(f"[NOTIFY] Telegram dosya gonderim hatasi ({basename}): {e}")
-        print("[NOTIFY] Telegram bildirimleri gonderildi.")
+                print(f"[NOTIFY] Buyuk-dosya uyarisi gonderilemedi: {e}")
+            return
+        try:
+            notify.send_document(zip_path, caption=f"[RAPORLAR] {basename}")
+            print("[NOTIFY] Telegram rapor zip'i gonderildi.")
+        except Exception as e:
+            print(f"[NOTIFY] Telegram zip gonderim hatasi: {e}")
     except Exception as e:
         print(f"[NOTIFY] Telegram bildirim hatasi: {e}")
