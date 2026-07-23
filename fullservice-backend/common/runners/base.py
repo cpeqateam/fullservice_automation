@@ -11,6 +11,11 @@ Sözleşme:
         - ctx.stop (threading.Event) set edilirse erken ve temiz çıkar.
         - Ürettiği log dosyalarının yollarını liste olarak döner.
 """
+# PEP 604 tip birleşimi (str | None) yalnızca Python 3.10+ ile ÇALIŞMA ANINDA geçerli.
+# Bazı Mac'lerde sistem Python'ı 3.9 olabildiği için bu import ile tüm annotation'lar
+# "lazy string" yapılır → 3.9'da da import anında patlamaz (3.10+ ile de uyumlu).
+from __future__ import annotations
+
 import os
 import platform
 import shlex
