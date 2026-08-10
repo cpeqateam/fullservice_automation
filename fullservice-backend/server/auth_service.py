@@ -2,11 +2,11 @@
 Kimlik doğrulama (FULL Servis, sunucu tarafı) — kullanıcı girişini doğrular.
 
 GRK auth_controller.login mantığının sadeleştirilmiş portudur:
-  • Kullanıcılar GRK ile AYNI tablodan (cpeqadb → grk_users) kontrol edilir.
+  • Kullanıcılar GRK ile AYNI tablodan (cpeqadb → users) kontrol edilir.
   • Şifre formatları: bcrypt → MD5 → SHA256 → düz metin (eski kayıtlarla uyum).
   • DB erişilemese bile her zaman izin verilen VARSAYILAN hesap: cpeteam / cpeteam.
 
-grk_users tablosu DB birleştirmesinde YENİDEN ADLANDIRILMADI (olduğu gibi kalıyor).
+Tablo eskiden grk_users idi, cpeqadb'de users olarak yeniden adlandırıldı (2026-07).
 Bağlantı firmware_db.py'nin hazırladığı SessionLocal'ı (aynı SSL bağlantısı) kullanır.
 """
 from __future__ import annotations

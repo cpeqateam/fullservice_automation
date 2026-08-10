@@ -318,6 +318,245 @@ def ping_summary_excel(txt_paths: list[str], node_name: str,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# IPERF — iperf3 client log'undan grafik Excel'i (GRK karşılığı yok, FULL Servis'e
+# özgü). Yalnızca [SUM] satırları kullanılır.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _iperf_bits_to_mbps(value: float, unit: str) -> float:
+    """iperf3'ün 'Kbits/sec' / 'Mbits/sec' / 'Gbits/sec' / 'Tbits/sec' değerini
+    Mbit/sn'ye normalize eder."""
+    u = (unit or "").upper()
+    if u.startswith("G"):
+        return round(value * 1_000, 3)
+    if u.startswith("T"):
+        return round(value * 1_000_000, 3)
+    if u.startswith("K"):
+        return round(value / 1_000, 3)
+    return round(value, 3)  # zaten Mbits
+
+
+_IPERF_ROW_RE = re.compile(
+    r"^\[\s*(SUM|\d+)\]\s+([\d.]+)\s*-\s*([\d.]+)\s+sec\s+"
+    r"[\d.]+\s+[KMGT]?Bytes\s+"
+    r"([\d.]+)\s+([KMGT]?bits/sec)"
+    r"(?:\s+\d+)?"
+    r"(?:\s+(sender|receiver))?",
+    re.IGNORECASE,
+)
+
+
+def _parse_iperf_dt(raw: str):
+    """'2026-06-15 14:42:21.475731' (Python str(datetime) çıktısı) parse eder."""
+    raw = (raw or "").strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_iperf_log(file_path):
+    """Bir iperf3 client logunu ayrıştırır: Komut satırından server/port/duration/
+    parallel, Baslangic/Bitis satırlarından zaman damgası, [ID]/[SUM] satırlarından
+    saniye başı throughput (Mbps) serisi.
+
+    -P 1'de iperf3 [SUM] satırı basmaz; bu durumda tek akışın kendi satırları
+    kullanılır."""
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        lines = f.readlines()
+    text = "".join(lines)
+
+    node_m = re.search(r"Node:\s*(\S+)", text)
+    cmd_m = re.search(r"Komut:\s*(.+)", text)
+    cmd = cmd_m.group(1).strip() if cmd_m else ""
+
+    def _cmd_int(flag):
+        m = re.search(rf"{flag}\s+(\d+)", cmd)
+        return int(m.group(1)) if m else None
+
+    server_m = re.search(r"-c\s+(\S+)", cmd)
+    # Server logunda "-c" hiç yazmaz (yalnizca client'a ozgu parametre); bu
+    # durumda sunucu IP'sini "local X port Y connected to" satirindan (kendi
+    # dinledigi adres) turetiyoruz.
+    local_m = re.search(r"local\s+([\d.]+)\s+port\s+\d+\s+connected to", text)
+    server_ip = server_m.group(1) if server_m else (local_m.group(1) if local_m else None)
+    start_m = re.search(r"Baslangic:\s*(.+)", text)
+    end_m = re.search(r"Bitis:\s*(.+)", text)
+
+    periodic, totals = [], []
+    for line in lines:
+        m = _IPERF_ROW_RE.match(line.strip())
+        if not m:
+            continue
+        stream_id, t0, t1, rate_val, rate_unit, role = m.groups()
+        row = {
+            "stream_id": stream_id,
+            "interval_start_sec": float(t0),
+            "interval_end_sec": float(t1),
+            "bitrate_mbps": _iperf_bits_to_mbps(float(rate_val), rate_unit),
+            "role": role.lower() if role else None,
+        }
+        (totals if role else periodic).append(row)
+
+    sum_periodic = [r for r in periodic if r["stream_id"] == "SUM"]
+    series = sorted(sum_periodic if sum_periodic else periodic,
+                    key=lambda r: r["interval_start_sec"])
+
+    sum_totals = [r for r in totals if r["stream_id"] == "SUM"]
+    final_totals = sum_totals if sum_totals else totals
+    sender_mbps = next((r["bitrate_mbps"] for r in final_totals if r["role"] == "sender"), None)
+    receiver_mbps = next((r["bitrate_mbps"] for r in final_totals if r["role"] == "receiver"), None)
+
+    # Server logunda "-t" hiç yazmaz (client'a özgü parametre); bu durumda
+    # süreyi periyodik satırların kapsadığı gerçek aralıktan türetiyoruz.
+    requested_duration = _cmd_int("-t")
+    measured_duration = round(max((r["interval_end_sec"] for r in series), default=0), 2) if series else None
+
+    return {
+        "node_name": node_m.group(1) if node_m else None,
+        "server_ip": server_m.group(1) if server_m else None,
+        "port": _cmd_int("-p"),
+        "duration": requested_duration,
+        "measured_duration_sec": measured_duration,
+        "parallel": _cmd_int("-P") or 1,
+        "sender_mbps": sender_mbps,
+        "receiver_mbps": receiver_mbps,
+        "has_final_summary": bool(final_totals),
+        "test_start_time": _parse_iperf_dt(start_m.group(1)) if start_m else None,
+        "test_end_time": _parse_iperf_dt(end_m.group(1)) if end_m else None,
+        "series": series,
+    }
+
+
+def iperf_summary_excel(txt_paths: list[str], node_name: str, server_node_name=None,
+                        brand=None, model=None, firmware=None,
+                        out_dir: str | None = None) -> str | None:
+    """Bir düğümün iperf3 client log(lar)ını grafik Excel'e çevirir — her log için
+    bir "Grafik" (saniye başı [SUM] throughput çizgi grafiği) ve bir "DataLog"
+    (ham Mbps değerleri + ortalama/sender/receiver özeti) sayfası.
+
+    İsimlendirme: fullServis_iperfOzet_<bilgisayar>_<marka>_<model>_<fw>_<zaman>.xlsx
+
+    Üretilen Excel'in yolunu döner; hiç geçerli log yoksa / bağımlılık yoksa None."""
+    try:
+        import xlsxwriter
+    except Exception as e:
+        print(f"[EXCEL] Iperf ozet atlandi (bagimlilik yok): {e}")
+        return None
+
+    valid = [p for p in (txt_paths or []) if p and os.path.exists(p)]
+    if not valid:
+        return None
+
+    from common.runners.base import grk_style_filename
+    fname = grk_style_filename("iperfOzet", brand, model, firmware, client=node_name, ext="xlsx")
+    out_path = os.path.join(out_dir or os.path.dirname(valid[0]), fname)
+
+    multi = len(valid) > 1
+    wb = xlsxwriter.Workbook(out_path)
+    produced = 0
+
+    for idx, path in enumerate(valid, start=1):
+        try:
+            parsed = _parse_iperf_log(path)
+        except Exception as e:
+            print(f"[EXCEL] Iperf parse hatasi ({os.path.basename(path)}): {e}")
+            continue
+
+        suffix = f" {idx}" if multi else ""
+        data_name = f"DataLog{suffix}"
+        ws_data = wb.add_worksheet(data_name)
+        ws_data.set_column(2, 2, 16)
+        ws_data.set_column(3, 3, 22)
+        values = [r["bitrate_mbps"] for r in parsed["series"]]
+        for i, v in enumerate(values):
+            ws_data.write(i, 0, v)
+
+        def _cell(val):
+            return val if val is not None else "N/A"
+
+        def _rate_cell(val):
+            """sender/receiver icin: deger yoksa, final ozet blogu VARDI ama bu
+            rol icin satir hic yazilmamissa (test kesintiye ugramis olabilir)
+            bunu ayirt eden bir not doner — duz "N/A" degil."""
+            if val is not None:
+                return val
+            if parsed.get("has_final_summary"):
+                return "N/A (final satir yazilmadi — test kesintiye ugramis olabilir)"
+            return "N/A"
+
+        # Sure: once client'in istedigi (-t) deger; o log'da yoksa (server
+        # logunda -t hic gecmez) periyodik satirlardan olculen gercek sureye
+        # duser — boylece Sure hicbir zaman bos kalmaz (veri varsa).
+        duration_cell = parsed.get("duration")
+        if duration_cell is None:
+            duration_cell = parsed.get("measured_duration_sec")
+
+        # DB'deki iperf_test tablosuyla eşleşen alanlar (session_id/test_name/
+        # ftp_file_path/created_at hariç — onlar log'dan değil, DB yazma anında
+        # oturum/FTP bağlamından gelir).
+        info_rows = [
+            ("Node", _cell(parsed.get("node_name") or node_name)),
+            ("Server Node", _cell(server_node_name)),
+            ("Server IP", _cell(parsed.get("server_ip"))),
+            ("Port", _cell(parsed.get("port"))),
+            ("Parallel", _cell(parsed.get("parallel"))),
+            ("Sure (sn)", _cell(duration_cell)),
+            ("Baslangic", _cell(parsed["test_start_time"].strftime("%Y-%m-%d %H:%M:%S")
+                                if parsed.get("test_start_time") else None)),
+            ("Bitis", _cell(parsed["test_end_time"].strftime("%Y-%m-%d %H:%M:%S")
+                            if parsed.get("test_end_time") else None)),
+            ("Sender (Mbps)", _rate_cell(parsed.get("sender_mbps"))),
+            ("Receiver (Mbps)", _rate_cell(parsed.get("receiver_mbps"))),
+        ]
+        if values:
+            info_rows.append(("Ortalama (Mbps)", round(sum(values) / len(values), 2)))
+        for r, (label, val) in enumerate(info_rows):
+            ws_data.write(r, 2, label)
+            ws_data.write(r, 3, val)
+        note_row = len(info_rows)
+
+        if values:
+            requested = parsed.get("duration")
+            if requested and abs(len(values) - requested) > 2:
+                msg = f"UYARI: test {requested}sn surmesi gerekirken {len(values)}sn olarak algilandi"
+                print(f"[EXCEL] Iperf {os.path.basename(path)}: {msg}")
+                ws_data.write(note_row, 2, msg)
+            ws_graph = wb.add_worksheet(f"Grafik{suffix}")
+            chart = wb.add_chart({"type": "line"})
+            chart.add_series({
+                "values": [data_name, 0, 0, len(values) - 1, 0],
+                "line": {"color": "red"},
+            })
+            title = f"{parsed.get('node_name') or node_name} -> {parsed.get('server_ip')}:{parsed.get('port')}"
+            chart.set_title({"name": f"iperf3 Throughput — {title}"})
+            chart.set_x_axis({"name": "Saniye"})
+            chart.set_y_axis({"name": "Mbps"})
+            chart.set_style(5)
+            chart.set_size({"x_scale": 2, "y_scale": 1.5})
+            ws_graph.insert_chart("A1", chart)
+        else:
+            note = "Veri yok — baglanti kurulamamis olabilir"
+            ws_data.write(note_row, 2, note)
+            print(f"[EXCEL] Iperf {os.path.basename(path)}: {note}")
+
+        produced += 1
+
+    if not produced:
+        wb.close()
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+        return None
+
+    wb.close()
+    print(f"[EXCEL] Iperf ozet Excel uretildi: {os.path.basename(out_path)}")
+    return out_path
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # WIFI — GRK parse.py (create_master_excel) + chart.py (create_combined_chart) portu
 # ─────────────────────────────────────────────────────────────────────────────
 

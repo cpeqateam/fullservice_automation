@@ -42,7 +42,7 @@ TO_ADDRESSES = [
 ]
 CC_ADDRESSES = [
     "aliimranatabey@gmail.com",
-    "sametozabaci@gmail.com",
+    # "sametozabaci@gmail.com",
     "farukozerr28@gmail.com",
     "ttibrahimsevinc@gmail.com",
 ]
