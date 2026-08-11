@@ -485,7 +485,72 @@ Telegram (tek ZIP) + mail bildirimi gider.
 |---|---|
 | IP, süre, hangi makine hangi testi koşacak | O makinedeki `ayarlar/config.json`'u düzenle. **Yeniden derleme yok.** |
 | Telegram/mail/DB şifresi | Linux'taki `ayarlar/secrets.json`'u düzenle. |
-| Kodda bir şey (yeni özellik / düzeltme) | O işletim sisteminde derleme scriptini tekrar çalıştır, yeni klasörü eskisinin üzerine kopyala. |
+| Kodda bir şey (yeni özellik / düzeltme) | Aşağıdaki **"Kod güncellemesi"** akışını uygula. |
+
+## Kod güncellemesi — makineleri yeni sürüme çekme
+
+Kaynak kodu sildiysen (A.4) elde yalnızca çalıştırılabilir uygulama var; kod
+değişince o uygulamanın **yeniden derilmesi** gerekir. Yani: kodu tekrar çek →
+derle → yeni klasörü eskisinin üzerine koy.
+
+**Hangi makineleri güncellemeliyim?** Değişiklik nerede olduğuna bakılır — ama
+pratikte ayırt etmek zor olduğu için **4 makineyi de güncellemek en güvenlisidir**
+(hepsi aynı `fullservice-backend` kodunu paylaşıyor).
+
+### Her makinede, sırayla
+
+**1) Uygulamayı kapat** (siyah konsol penceresi açıksa kapat) — çalışan dosyanın
+üzerine yazılamaz (özellikle Windows'ta "dosya kullanımda" hatası verir).
+
+**2) `ayarlar/` klasörünü yedekle** — içinde `config.json` (+ Linux'ta
+`secrets.json`, `certs/`) var; bunlar repoda YOK, kaybedersen tekrar üretemezsin:
+```bash
+cp -r ~/Desktop/"FULL SERVIS OTOMASYON"/FULLSERVIS-SUNUCU/ayarlar /tmp/ayarlar_yedek
+```
+(Windows: `ayarlar` klasörünü Masaüstüne kopyala.)
+
+**3) Kodu tekrar çek** — "FULL SERVIS OTOMASYON" klasörünün içine:
+```bash
+cd ~/Desktop/"FULL SERVIS OTOMASYON"
+git clone https://github.com/cpeqateam/fullservice_automation.git
+cd fullservice_automation && git checkout aliimran
+```
+> Kaynak klasörü silmediysen `git clone` yerine, o klasörün içinde
+> `git checkout aliimran && git pull` yeterlidir.
+
+**4) Derle** — makineye göre (AŞAMA A ile aynı):
+
+| Makine | Komut |
+|---|---|
+| Linux | `chmod +x launchers/build/derle-linux.sh && ./launchers/build/derle-linux.sh` |
+| Mac | `chmod +x launchers/build/derle-mac.sh && ./launchers/build/derle-mac.sh` |
+| Windows | `launchers\build\derle-windows.bat` dosyasına çift tıkla |
+
+**5) Yeni klasörü eskisinin yerine koy** — eskiyi sil, yenisini taşı:
+```bash
+rm -rf ../FULLSERVIS-SUNUCU                                    # eski (ayarlar yedekte)
+mv launchers/build/cikti/FULLSERVIS-SUNUCU ../FULLSERVIS-SUNUCU
+```
+(Mac/Windows'ta `FULLSERVIS-SUNUCU` yerine o makinenin uygulama adını yaz.)
+
+**6) `ayarlar/` klasörünü geri koy** — derleme yeni bir `ayarlar/` üretir ama
+içinde yalnızca repodaki varsayılan `config.json` olur; **senin** ayarların
+(özellikle Linux'ta `secrets.json` + `certs/`) 2. adımdaki yedekte:
+```bash
+cp -r /tmp/ayarlar_yedek/. ../FULLSERVIS-SUNUCU/ayarlar/
+ls ../FULLSERVIS-SUNUCU/ayarlar ../FULLSERVIS-SUNUCU/ayarlar/certs
+```
+⚠️ Bu adımı atlarsan Linux'ta Telegram/mail/DB/FTP sessizce çalışmaz.
+
+**7) Kaynak kodu tekrar sil** (A.4) ve **8) uygulamayı bir kez çalıştırıp**
+panelde o makinenin **yeşil** olduğunu doğrula.
+
+> **Windows'ta firewall kuralı:** bir kez eklediysen kalıcıdır, yeniden derlemede
+> tekrar eklemene gerek yoktur (bkz. A.1.1 madde 6).
+
+> **Sürüm doğrulama:** güncellemenin gerçekten geçtiğinden emin olmak için,
+> derlemeden önce repo klasöründe `git log --oneline -1` çalıştır ve son commit'in
+> GitHub'daki `aliimran` dalıyla aynı olduğunu gör.
 
 ---
 
