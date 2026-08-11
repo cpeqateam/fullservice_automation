@@ -179,6 +179,39 @@ def save_ping(session_id, node_name, stats: dict, ftp_file_path=None):
         db.close()
 
 
+# ── FTP YOLU GÜNCELLEME (oturum sonu) ───────────────────────────────────
+# Sonuç satırları test biterken yazılır; o an dosya henüz FTP'ye gitmemiştir,
+# bu yüzden ftp_file_path yalnızca hedef KLASÖRü gösterir. Oturum sonunda
+# dosyalar yüklendikten sonra burası satırları gerçek DOSYA yoluyla günceller —
+# test platformundaki "indir" butonu bu tam yolu kullanır.
+_FTP_UPDATE_TABLES = {"ping": T_PING, "iperf": T_IPERF, "wifi": T_WIFI, "speed": T_SPEED}
+
+
+def update_ftp_file_path(session_id, kind: str, node_name: str, ftp_file_path: str) -> int:
+    """Bir oturumdaki (kind, node_name) satırlarının ftp_file_path'ini tam dosya
+    yoluyla günceller. Güncellenen satır sayısını döner (DB yoksa 0)."""
+    table = _FTP_UPDATE_TABLES.get(kind)
+    if not db_available() or not session_id or not table or not ftp_file_path:
+        return 0
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        res = db.execute(text(
+            f"UPDATE {table} SET ftp_file_path = :ftp "
+            "WHERE session_id = :sid AND node_name = :nn AND test_name = :tn"
+        ), {"ftp": ftp_file_path, "sid": session_id, "nn": node_name, "tn": TEST_NAME})
+        db.commit()
+        n = res.rowcount or 0
+        print(f"[DB] {table} ftp_file_path guncellendi: node={node_name} satir={n}")
+        return n
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] {table} ftp_file_path guncellenemedi ({node_name}): {e}")
+        return 0
+    finally:
+        db.close()
+
+
 # ── IPERF ───────────────────────────────────────────────────────────────
 def save_iperf(session_id, node_name, server_node_name, stats: dict, ftp_file_path=None):
     """iperf_test'e bir iperf özeti satırı yazar."""

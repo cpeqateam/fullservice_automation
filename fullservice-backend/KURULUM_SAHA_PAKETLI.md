@@ -46,14 +46,166 @@ cd fullservice_automation && git checkout aliimran
 `launchers\build\derle-windows.bat` dosyasına **çift tıkla**.
 Çıktı: `launchers\build\cikti\FULLSERVIS-WINDOWS-WIFI\` (`.exe` + `ayarlar\config.json`).
 
-### A.2 — Mac uygulamaları (bir Mac'te, ikisini birden üretir)
+## A.1.1 — WINDOWS: derleme bitti, şimdi ne yapmalısın (adım adım kontrol)
+
+Bu makine kendi GitHub klonundan kendi uygulamasını üretiyor (Linux'takiyle
+aynı mantık — bkz. A.3.1). Sırayla, PowerShell'de:
+
+**0) Çıktı gerçekten oluşmuş mu?**
+```powershell
+dir launchers\build\cikti\FULLSERVIS-WINDOWS-WIFI
+# olması gerekenler: FULLSERVIS-WINDOWS-WIFI.exe, ayarlar\config.json
+```
+
+**1) Gömülen config doğru mu?**
+```powershell
+type launchers\build\cikti\FULLSERVIS-WINDOWS-WIFI\ayarlar\config.json | findstr win_wifi
+# beklenen: "win_wifi": { "ip": "192.168.1.13", "interface": "Wi-Fi" }
+```
+
+**2) Statik IP — şimdi doğrula (Yönetici PowerShell):**
+```powershell
+Get-NetIPConfiguration -InterfaceAlias "Wi-Fi"
+# beklenen: IPv4Address 192.168.1.13
+```
+- `192.168.1.13` yoksa/farklıysa:
+  ```powershell
+  provisioning\windows\set-static-ip.ps1 -NodeId win_wifi
+  ```
+  sonra `Get-NetIPConfiguration` ile tekrar doğrula.
+- ⚠️ **Arayüz adı gerçekten "Wi-Fi" mi?** `Get-NetAdapter` ile listele — bazı
+  makinelerde "Wi-Fi 2", "Kablosuz Ağ Bağlantısı" gibi farklı görünür. Farklıysa
+  ya adaptörü Windows ayarlarından "Wi-Fi" diye yeniden adlandır, ya da
+  `config.json`'daki `win_wifi.interface` değerini gerçek ada göre değiştirip
+  **yeniden derle**.
+- Reboot sonrası (AŞAMA C, 45 dk kuralı) bu kontrolü bir daha yap.
+
+**3) secrets.json / certs/** — bu makinede **yok/gerekmiyor** (sadece Linux
+sunucuda, bkz. B.3). Atla.
+
+**4) `cikti\FULLSERVIS-WINDOWS-WIFI\` klasörünü repo'nun yanına taşı**
+(repo kökünden — klonladığın klasörün içinden):
+```powershell
+move launchers\build\cikti\FULLSERVIS-WINDOWS-WIFI ..\FULLSERVIS-WINDOWS-WIFI
+```
+Sonuç: `FULL SERVIS OTOMASYON\FULLSERVIS-WINDOWS-WIFI\` — repo'nun kardeşi.
+```powershell
+dir ..\FULLSERVIS-WINDOWS-WIFI
+dir ..\FULLSERVIS-WINDOWS-WIFI\ayarlar
+```
+`.exe` ve `ayarlar\config.json` görmelisin.
+
+**5) Taşıma doğrulandıysa klonladığın kaynak kod klasörünü sil** (bkz. A.4) —
+sadece 4. adım gerçekten başarılıysa.
+
+**6) İlk çalıştırma güveni** — `.exe`'ye çift tıkla → **Windows Defender
+SmartScreen** uyarısı çıkarsa **"Daha fazla bilgi" → "Yine de çalıştır"**
+(bir kerelik). Ayrıca **Windows Firewall'da agent portuna (7531,
+`config.json → agent_port`) inbound izin ver** — vermezsen kayıt (agent→sunucu,
+8770) çalışsa bile panelde **kırmızı** kalır, çünkü Health-Check sunucudan
+agent'a **ters yönde** (7531'e) bağlanmayı dener:
+```powershell
+New-NetFirewallRule -DisplayName "FULL Servis Agent" -Direction Inbound -Protocol TCP -LocalPort 7531 -Action Allow
+```
+
+**7) Gerçek deneme** — `.exe`'ye çift tıkla → konsol penceresi açık kalmalı
+(kapatma). Bu bir **agent** uygulaması, kendi paneli yok — doğrulamayı
+**Linux sunucunun panelinden** yap: bir tarayıcıda `http://192.168.1.10:8770`
+aç → giriş `cpeteam`/`cpeteam` → Health-Check'te **win_wifi yeşil** olmalı.
+Hâlâ kırmızıysa Linux'tan doğrudan test et:
+```bash
+curl http://<windows-ip>:7531/health
+# beklenen: {"status":"ok","node_id":"win_wifi"}
+```
+
+> ⚠️ Bu denemeden sonra makine 45 dakikayı geçmeden test başlatabilirsin, ama
+> gerçek test günü öncesi son bir kez daha reboot et (uptime kilidi).
+
+### A.2 — Mac uygulamaları (her Mac kendi klonundan kendi uygulamasını üretir)
 ```bash
 chmod +x launchers/build/derle-mac.sh
 ./launchers/build/derle-mac.sh
 ```
-Çıktı: `cikti/FULLSERVIS-MAC-WIFI/` ve `cikti/FULLSERVIS-MAC-KABLO/`.
-Bir Mac'te üretip diğerine USB ile götür — **koşul:** iki Mac de aynı işlemci ailesi
-(ikisi de Apple Silicon **ya da** ikisi de Intel).
+Çıktı: **her iki** `cikti/FULLSERVIS-MAC-WIFI/` ve `cikti/FULLSERVIS-MAC-KABLO/`
+(script ikisini de üretir, sen sadece o makineye ait olanı kullanacaksın).
+
+> Not: Artık her Mac GitHub'dan kendi klonunu çekip kendi üstünde derliyor
+> (Linux'takiyle aynı mantık) — bu yüzden eski "bir Mac'te üret, USB ile
+> diğerine taşı" kısıtı (aynı işlemci ailesi şartı) **geçerli değil**; her Mac
+> kendi native binary'sini üretir.
+
+## A.2.1 — MAC (Kablo veya Wi-Fi): derleme bitti, şimdi ne yapmalısın
+
+Hangi Mac'tesen ona ait `<UYGULAMA>` adını kullan: Kablo Mac'te
+`FULLSERVIS-MAC-KABLO`, Wi-Fi Mac'te `FULLSERVIS-MAC-WIFI`. Terminalde,
+sırayla:
+
+**0) Çıktı gerçekten oluşmuş mu?**
+```bash
+ls launchers/build/cikti/<UYGULAMA>/
+# olması gerekenler: <UYGULAMA> (calistirilabilir), ayarlar/config.json,
+# BASLAT-<UYGULAMA>.command
+```
+
+**1) Gömülen config doğru mu?**
+```bash
+grep -A1 '"mac_cable"\|"mac_wifi"' launchers/build/cikti/<UYGULAMA>/ayarlar/config.json
+# mac_cable icin beklenen interface: "AX88179A"  (ip 192.168.1.11)
+# mac_wifi  icin beklenen interface: "Wi-Fi"     (ip 192.168.1.14)
+```
+
+**2) Statik IP — şimdi doğrula:**
+```bash
+networksetup -getinfo "AX88179A"   # mac_cable icin
+networksetup -getinfo "Wi-Fi"      # mac_wifi icin
+# beklenen: IP address: 192.168.1.11 (kablo) / 192.168.1.14 (wifi)
+```
+- Yanlışsa/yoksa:
+  ```bash
+  sudo provisioning/macos/set-static-ip.sh mac_cable   # ya da mac_wifi
+  ```
+  sonra `networksetup -getinfo ...` ile tekrar doğrula.
+- ⚠️ **Servis adı gerçekten "AX88179A" mı?** USB-Ethernet adaptörler
+  sürücüye göre farklı isimle görünebilir. Kontrol:
+  ```bash
+  networksetup -listallnetworkservices
+  ```
+  Listede `AX88179A` yoksa gerçek adı `config.json`'daki
+  `mac_cable.interface` değerine yaz ve **yeniden derle**.
+- Reboot sonrası (AŞAMA C, 45 dk kuralı) bu kontrolü bir daha yap.
+
+**3) secrets.json / certs/** — bu makinede **yok/gerekmiyor** (sadece Linux
+sunucuda, bkz. B.3). Atla.
+
+**4) `cikti/<UYGULAMA>/` klasörünü repo'nun yanına taşı** (repo kökünden):
+```bash
+mv launchers/build/cikti/<UYGULAMA> ../<UYGULAMA>
+```
+Sonuç: `FULL SERVIS OTOMASYON/<UYGULAMA>/` — repo'nun kardeşi.
+```bash
+ls ../<UYGULAMA>/
+ls ../<UYGULAMA>/ayarlar/
+```
+Binary, `BASLAT-*.command` ve `ayarlar/config.json` görmelisin.
+
+**5) Taşıma doğrulandıysa klonladığın kaynak kod klasörünü sil** (bkz. A.4) —
+sadece 4. adım gerçekten başarılıysa. (Kullanmadığın diğer `<UYGULAMA>`
+zaten bu klasörle birlikte gider, ayrıca taşımana gerek yok.)
+
+**6) İlk çalıştırma güveni** — macOS "geliştirici doğrulanamadı" derse:
+`BASLAT-*.command`'a **sağ tık → Aç → Aç** (bir kerelik). Hâlâ açılmıyorsa:
+```bash
+xattr -dr com.apple.quarantine ../<UYGULAMA>
+```
+
+**7) Gerçek deneme** — `BASLAT-<UYGULAMA>.command`'a çift tıkla → Terminal
+açılıp uygulama başlamalı. Bu bir **agent** uygulaması, kendi paneli yok —
+doğrulamayı **Linux sunucunun panelinden** yap: bir tarayıcıda
+`http://192.168.1.10:8770` aç → giriş `cpeteam`/`cpeteam` → Health-Check'te
+bu makine (**mac_cable** ya da **mac_wifi**) **yeşil** olmalı.
+
+> ⚠️ Bu denemeden sonra makine 45 dakikayı geçmeden test başlatabilirsin, ama
+> gerçek test günü öncesi son bir kez daha reboot et (uptime kilidi).
 
 ### A.3 — Linux sunucu uygulaması (Dell'de)
 ```bash
@@ -72,6 +224,141 @@ Bu script önce paneli (Vue) derler, sonra paneli exe'nin içine gömer.
 > ve `network.interface` değerlerini odanın gerçek LAN'ına göre düzenle — böylece
 > exe'nin **içine gömülen** yedek config de doğru olur. (Yine de dışarıdaki
 > `ayarlar/config.json` her zaman öncelikli; sonradan yeniden derlemeden değiştirebilirsin.)
+
+## A.3.1 — LINUX: derleme bitti, şimdi ne yapmalısın (adım adım kontrol)
+
+`derle-linux.sh` bitince o makinede aşağıdakileri **sırayla** yap; her adımdan
+sonraki komutla doğrula, atlama.
+
+**0) Neredesin, çıktı gerçekten oluşmuş mu?**
+```bash
+pwd                                            # repo kökünde olmalısın (klonladığın klasör)
+ls launchers/build/cikti/FULLSERVIS-SUNUCU/    # şunlar olmalı:
+#   FULLSERVIS-SUNUCU                (calistirilabilir dosya)
+#   ayarlar/config.json
+#   ayarlar/certs/                   (henuz bos, B.3'te dolacak)
+#   FULL-Servis-Sunucu.desktop
+```
+Bu dosyalar yoksa derleme başarısız demektir — `derle-linux.sh` çıktısındaki
+son hata satırına bak, buraya geçme.
+
+**1) Gömülen config gerçekten doğru mu?**
+```bash
+grep interface launchers/build/cikti/FULLSERVIS-SUNUCU/ayarlar/config.json
+# beklenen: "server": { "ip": "192.168.1.10", "interface": "eth0" }
+```
+`enp0s1` görürsen: repo güncel değil demektir — `git pull` çekip
+`derle-linux.sh`'ı tekrar çalıştır.
+
+**2) Statik IP — DAHA ÖNCE ayarladıysan bile şimdi tekrar doğrula**
+(reboot, DHCP yenileme, elle ayarlama gibi nedenlerle değişmiş olabilir).
+Bazı makinelerde `ip` komutu kurulu değil/çalışmıyor — o durumda `ifconfig`
+kullan (ikisi de aynı bilgiyi verir):
+```bash
+ip addr show eth0 | grep inet          # ip calismiyorsa:
+ifconfig eth0 | grep "inet "           # bunu kullan
+# beklenen (ikisinde de): inet 192.168.1.10 ...
+```
+- `192.168.1.10` **yoksa veya farklıysa** (ör. DHCP'den gelen `192.168.1.102`
+  gibi bir adres görüyorsan statik IP hiç uygulanmamış demektir) → script'i
+  (yeniden) çalıştır:
+  ```bash
+  sudo fullservice-backend/provisioning/linux/set-static-ip.sh server
+  ```
+  sonra yukarıdaki komutu (`ip addr` ya da `ifconfig`, hangisi çalışıyorsa)
+  **tekrar** çalıştırıp gerçekten `192.168.1.10` göründüğünü teyit et.
+- Doğruysa bile not al: **AŞAMA C'de makineyi yeniden başlatacaksın** (45 dk
+  kuralı) — reboot'tan sonra bu kontrolü bir kez daha yap, statik IP
+  NetworkManager profilinde kalıcı olsa da gözle görmeden güvenme.
+
+**3) secrets.json + certs/ (Telegram/mail/DB için — testin ÇALIŞMASI için ZORUNLU DEĞİL)**
+Şu an elinde yoksa sorun değil, testler yine çalışır (giriş `cpeteam`/`cpeteam`,
+Marka/Model/Firmware serbest metin olur, Telegram/mail/DB kaydı gitmez). Elde
+ettiğinde (USB ile) şu tam konuma koy:
+```
+launchers/build/cikti/FULLSERVIS-SUNUCU/ayarlar/secrets.json
+launchers/build/cikti/FULLSERVIS-SUNUCU/ayarlar/certs/ca.crt
+launchers/build/cikti/FULLSERVIS-SUNUCU/ayarlar/certs/client.crt
+launchers/build/cikti/FULLSERVIS-SUNUCU/ayarlar/certs/client.key
+```
+(`secrets.json` içeriği için bkz. B.3 aşağıda.) Daha sonra eklersen yeniden
+derlemene gerek yok — bu klasördeki `ayarlar/` her zaman canlı okunur.
+
+**4) `cikti/FULLSERVIS-SUNUCU/` klasörünü repo'nun yanına taşı**
+(2. ve 3. adımı bitirdikten sonra — sırası önemli değil ama taşımadan
+kaynak klasörü SİLME). Repo kökünden (klonladığın `fullservice_automation/`
+klasörünün içinden) çalıştır — `FULL SERVIS OTOMASYON/` klasörüne, repo'nun
+**kardeşi** olarak taşınır:
+```bash
+mv launchers/build/cikti/FULLSERVIS-SUNUCU ../FULLSERVIS-SUNUCU
+```
+(Bkz. B.2 — aynı mantık tüm makineler için orada da anlatılıyor.)
+
+**5) Taşınan klasörde her şey hâlâ yerinde mi?**
+```bash
+ls "$(xdg-user-dir DESKTOP)/FULLSERVIS-SUNUCU/"
+ls "$(xdg-user-dir DESKTOP)/FULLSERVIS-SUNUCU/ayarlar/"
+```
+`FULLSERVIS-SUNUCU`, `FULL-Servis-Sunucu.desktop`, `ayarlar/config.json`
+görmelisin (3. adımı yaptıysan `secrets.json` ve `certs/*` de).
+
+**6) Şimdi (ve ancak şimdi) klonladığın kaynak kod klasörünü sil** (bkz. A.4).
+
+**7) İlk çalıştırma güveni** — `.desktop` dosyasına sağ tık →
+**"Çalıştırmaya izin ver"** (bir kerelik, B.4).
+> Bazı GNOME/Nautilus kurulumlarında `.desktop` dosyası "güvenilir" işaretlenmeden
+> çift tıklanınca **metin dosyası gibi açılır**, program başlamaz. Bu durumda
+> `.desktop`'ın **yanındaki asıl çalıştırılabilir dosyaya** (`FULLSERVIS-SUNUCU`,
+> uzantısız) çift tıkla — sonuç birebir aynıdır, `.desktop` sadece kolaylık
+> kısayolu. Hangisi çalışıyorsa onu kullanmaya devam edebilirsin.
+
+**8) Gerçek deneme** — `.desktop`'a (ya da yukarıdaki not geçerliyse doğrudan
+`FULLSERVIS-SUNUCU`'ya) çift tıkla → terminal penceresi açılmalı → tarayıcıda
+`http://192.168.1.10:8770` otomatik açılmalı (açılmazsa elle yaz).
+Giriş `cpeteam`/`cpeteam` ile çalışmalı. Diğer 3 makine henüz kurulmadığı için
+panelde şu an sadece Linux düğümü **yeşil**, diğer 3'ü **kırmızı/gri** görünür
+— bu normal, hata değil.
+
+> ⚠️ Bu denemeyi yaptıktan sonra makine 45 dakikayı geçmeden test
+> **başlatabilirsin**, ama gerçek test günü öncesi son bir kez daha reboot et
+> (uptime kilidi — bkz. AŞAMA C).
+
+---
+
+### A.4 — Derleme bitince: kaynak kodu sil, sadece çıktıyı bırak
+
+Her makine GitHub'dan kod çekip (git clone + `git checkout aliimran`) kendi
+uygulamasını kendi üstünde derliyor. Derleme bitince o makinede **artık git
+deposuna ihtiyaç yok** — uygulama PyInstaller "onefile" ile tek dosyada:
+Python + kod + tüm bağımlılıklar (Linux'ta ayrıca derlenmiş panel/Vue de)
+doğrudan çalıştırılabilirin içine gömülü.
+
+**KALACAK** — sadece Masaüstündeki `cikti/<UYGULAMA>/` klasörü (bkz. B.2):
+
+| Makine | Klasörde ne var |
+|---|---|
+| Linux | `FULLSERVIS-SUNUCU` + `ayarlar/{config.json, secrets.json, certs/}` + `.desktop` kısayolu |
+| Mac (Kablo / Wi-Fi) | `FULLSERVIS-MAC-*` + `ayarlar/config.json` + `BASLAT-*.command` |
+| Windows | `FULLSERVIS-WINDOWS-WIFI.exe` + `ayarlar\config.json` |
+
+**SİLİNEBİLİR** — git ile çekilen `fullservice_automation/` klasörünün tamamı:
+kaynak kod, `venv/` (veya Python), `node_modules/`, `build/` ve `dist/`
+(PyInstaller'ın ara klasörleri — Masaüstüne kopyaladığın `cikti/` ile
+karıştırma), `.git/` — hepsi silinebilir, uygulamanın çalışması için hiçbiri
+gerekmiyor.
+
+⚠️ Sırayla yap:
+1. `cikti/<UYGULAMA>/` klasörünü önce **Masaüstüne kopyala** (B.2).
+2. Aynı makinede birden fazla uygulama üretiyorsan (ör. Mac'te iki `cikti/`
+   klasörü, ya da diğer Mac'e USB ile taşıyacaksan) **hepsini çıkardıktan
+   sonra** sil.
+3. Kopyaladığından emin olduktan sonra klonladığın `fullservice_automation/`
+   klasörünü (git deposu dahil) sil.
+
+Kod ileride değişirse: yine `git clone` + `git checkout aliimran` ile baştan
+çek, yeniden derle, çıkan `cikti/` klasörünü Masaüstündeki eskisinin üzerine
+kopyala (bkz. aşağıdaki "Sonradan değişiklik" tablosu) — bu yüzden silmekten
+çekinme, her şey GitHub'da duruyor.
 
 ---
 
@@ -110,15 +397,29 @@ Bu script önce paneli (Vue) derler, sonra paneli exe'nin içine gömer.
 
 ## B.2 — Uygulama klasörünü kopyala
 
-`cikti/<UYGULAMA>/` klasörünü, **içindeki `ayarlar/` ile birlikte**, o makinenin
-**Masaüstüne** kopyala:
+Her makinede Masaüstünde bir **"FULL SERVIS OTOMASYON"** klasörü açıp repoyu
+onun **içine** klonladığını varsayıyoruz (`FULL SERVIS OTOMASYON/fullservice_automation/`).
+`cikti/<UYGULAMA>/` klasörünü, **içindeki `ayarlar/` ile birlikte**, repo'nun
+**yanına** (bir üst dizine — yani `FULL SERVIS OTOMASYON/` içine, `fullservice_automation/`
+klasörünün kardeşi olarak) taşı. Komutu **repo kökünden** (klonladığın klasörün
+içinden) çalıştır:
 
-| Klasör | Makine |
+| Makine | Komut (repo kökünden) |
 |---|---|
-| `FULLSERVIS-SUNUCU/` | Linux |
-| `FULLSERVIS-MAC-KABLO/` | Mac (kablo) |
-| `FULLSERVIS-MAC-WIFI/` | Mac (wifi) |
-| `FULLSERVIS-WINDOWS-WIFI/` | Windows |
+| Linux | `mv launchers/build/cikti/FULLSERVIS-SUNUCU ../FULLSERVIS-SUNUCU` |
+| Mac (kablo) | `mv launchers/build/cikti/FULLSERVIS-MAC-KABLO ../FULLSERVIS-MAC-KABLO` |
+| Mac (wifi) | `mv launchers/build/cikti/FULLSERVIS-MAC-WIFI ../FULLSERVIS-MAC-WIFI` |
+| Windows (cmd) | `move launchers\build\cikti\FULLSERVIS-WINDOWS-WIFI ..\FULLSERVIS-WINDOWS-WIFI` |
+
+Taşıma bitince o klasörün yapısı şöyle olmalı:
+```
+FULL SERVIS OTOMASYON/
+├── fullservice_automation/     ← klon (B.2'den sonra, A.4'e göre silinecek)
+└── FULLSERVIS-SUNUCU/          ← (ya da makineye göre diğer isim) — KALICI, çift tıklanan bu
+```
+> Mac'te `derle-mac.sh` **her iki** uygulamayı da üretir (`cikti/`'de ikisi de
+> vardır) — o makineye ait **olmayanı** taşımana/tutmana gerek yok, repo
+> silinince zaten gider.
 
 > ⚠️ **Uygulamanın adını değiştirme** — hangi makine olduğunu **dosya adından**
 > çözüyor (FULLSERVIS-WINDOWS-WIFI → win_wifi). Ad değişirse kimliğini bulamaz.
@@ -193,7 +494,9 @@ Telegram (tek ZIP) + mail bildirimi gider.
 | Belirti | Çözüm |
 |---|---|
 | Bir makine **kırmızı** | Uygulaması açık mı? `ping 192.168.1.10` gidiyor mu? Ya da **45 dk kuralı** — makineyi yeniden başlat. |
+| Terminalde **"Sunucuya ulasilamadi (http://192.168.1.10:8770)"** tekrar tekrar yazıyor | Agent, sunucuya `POST /api/register` atamıyor demektir. Sırayla kontrol et: **1)** O makinede `ping 192.168.1.10` gidiyor mu? Gitmiyorsa **Wi-Fi yanlış ağa bağlı olabilir** — makine, gateway'i 192.168.1.1 olan **CPE'nin kendi Wi-Fi/LAN'ına** bağlı olmalı, başka bir ağa (ev/ofis Wi-Fi'si) değil. **2)** `ipconfig` (Win) / `ifconfig` (Mac) ile o adaptörün IP'sinin gerçekten 192.168.1.13/14 (ve doğru subnet'te) olduğunu doğrula. **3)** Konsolun en üstündeki `[AGENT] node_id=... server=... lan_ip=...` satırına bak — `lan_ip=` beklenenden farklıysa (ör. başka bir ağın IP'si) makine internete/8.8.8.8'e o **yanlış** arayüzden çıkıyor demektir (bkz. `detect_lan_ip()`), aynı kök nedene işaret eder. **4)** Linux'ta sunucu penceresi hâlâ açık mı (kapatılmamış mı)? |
 | "Bu uygulamanın hangi bilgisayara ait olduğu anlaşılamadı" | Uygulama adı değişmiş → eski adına çevir; ya da yanına `ayarlar/agent.json` koy: `{"node_id":"win_wifi","server_url":"http://192.168.1.10:8770"}` |
+| Windows/Mac **kayıt oldu** (konsolda "Sunucuya kayit olundu" / uptime görünüyor) ama panelde **hâlâ kırmızı** | Health-Check, sunucudan agent'a **ters yönde** bağlanır (agent'ın 7531 portuna). Windows Firewall'da bu porta inbound izin ver (bkz. A.1.1 madde 6); Mac'te genelde sorun olmaz. Doğrulama: Linux'tan `curl http://<agent-ip>:7531/health`. |
 | Panel tarayıcıda açılmadı | Elle yaz: `http://192.168.1.10:8770` |
 | **iperf** kırmızı/hatalı | mac_cable açık mı? iki Mac'te de iperf3 kurulu mu? |
 | **torrent** hatası | Windows'ta qBittorrent açık mı? Web UI 8080 / admin / Admin123, "Bypass auth" kapalı mı? |

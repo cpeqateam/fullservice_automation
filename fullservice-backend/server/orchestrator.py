@@ -164,17 +164,20 @@ class Orchestrator:
                     "session_id": self.session.get("session_id"),
                     "started_at": self.session.get("started_at"),
                     "log_offset": self.session.get("log_offset", 0),
+                    "db_session_id": self.session.get("db_session_id"),
                 }
 
         if fire:
             self._on_session_complete(fire)
 
     def _on_session_complete(self, info: dict):
-        """Test bitince (lock dışında): Telegram+mail bildirimi VE error_log'u FTP'ye."""
-        # 1) Telegram (mesaj + loglar) + mail (sadece mesaj)
+        """Test bitince (lock dışında): rapor+FTP+DB tamamlama ve Telegram+mail
+        bildirimi (hepsi send_completion içinde, arka planda) VE error_log'u FTP'ye."""
+        # 1) Özet Excel + FTP yükleme + DB ftp_file_path güncelleme + Telegram/mail
         try:
             notification_service.send_completion(
-                info["device"], info["session_id"], info["started_at"])
+                info["device"], info["session_id"], info["started_at"],
+                info.get("db_session_id"), self._iperf_server_node_name())
         except Exception as e:
             print(f"[ORCH] Bildirim baslatilamadi: {e}")
         # 2) error_log dilimini FTP'ye yükle (bildirim YOK — sadece hata görünürlüğü)
@@ -404,48 +407,29 @@ class Orchestrator:
             print(f"[ORCH] record_result hatasi ({kind}): {e}")
 
     def upload_log_to_ftp(self, node_id: str, file_path: str):
-        """Bir log dosyasını FTP'ye, doğru klasör yapısına (arka planda) yükler:
-        <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
+        """Yeni gelen bir ham logu OTURUM SONUNA hazırlar (FTP'ye burada yüklemez).
 
-        FTP'ye SADECE rapor niteliğindeki dosyalar gider (kullanıcı isteri — FTP ham
-        log yığınıyla dolmasın):
-          • WIFI  → ham logdan GRK formatında Excel (Veriler+Özet+10 grafik) üretilir,
-                    FTP'ye YALNIZCA bu Excel gider (ham .txt gitmez). Adı ham logdan
-                    türediği için bilgisayar adını zaten içerir.
-          • IPERF → .txt olduğu gibi gider (iperf'in raporu metindir).
-          • PING  → BURADA FTP'ye HİÇBİR ŞEY gitmez. Ping'in çıktısı, oturum sonunda
-                    bilgisayar başına üretilen tek ÖZET Excel'dir (report_service).
-          • Diğer (youtube/torrent) → zaten log üretmez; gelse bile gönderilmez.
+        Tek iş: WIFI ham logundan GRK formatındaki Excel'i (Veriler+Özet+10 grafik)
+        şimdiden üretmek. Matplotlib yavaş olduğu için bu iş teste yayılsın, oturum
+        sonunda topluca yapılıp bildirimi geciktirmesin diye arka plan thread'inde
+        koşar. Üretilen .xlsx ham logun yanına (oturum klasörüne) yazılır.
 
-        Ham .txt loglar yine de sunucunun logs/ klasöründe (yerelde) durur — özet Excel
-        üretimi ve arşiv için. Excel üretimi + yükleme arka plan thread'inde yapılır
-        (matplotlib yavaş olabilir; HTTP yanıtını bloke etmesin)."""
+        FTP'ye yükleme ARTIK BURADA YAPILMAZ: oturum sonunda report_service
+        (upload_session_to_ftp) tüm dosyaları — ham .txt'ler ve Excel'ler dahil —
+        test tipine göre klasörlere tek seferde yükler. Böylece hem her şey FTP'ye
+        gider, hem aynı dosya iki kez yüklenmez, hem de DB'deki ftp_file_path
+        yüklemeden HEMEN SONRA gerçek dosya yoluyla güncellenebilir."""
         if not file_path:
             return
-        dev = self.session.get("device", {})
-        node_name = node_log_folder(node_id, self.config)
-        test_type = ftp_service.test_type_from_filename(os.path.basename(file_path))
-
-        # Ping ham logları ve tanınmayan/yük-basıcı loglar FTP'ye gitmez (yerelde kalır).
-        if test_type not in ("Wifi", "Iperf"):
+        if ftp_service.test_type_from_filename(os.path.basename(file_path)) != "Wifi":
             return
 
-        target = ftp_service.build_target_dir(
-            dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
-
         def _work():
-            """Wifi ise Excel'i üretip onu, Iperf ise .txt'yi FTP'ye yükler (thread hedefi)."""
-            if test_type == "Wifi":
-                try:
-                    xlsx = excel_service.wifi_log_to_excel(file_path)
-                except Exception as e:
-                    print(f"[ORCH] Wifi Excel uretilemedi: {e}")
-                    xlsx = None
-                if not xlsx:
-                    return                       # Excel çıkmadıysa ham .txt'yi FTP'ye koyma
-                ftp_service.upload_files_to_ftp([xlsx], target)
-            else:                                # Iperf
-                ftp_service.upload_files_to_ftp([file_path], target)
+            """Wifi ham logundan Excel'i üretir (thread hedefi); yükleme oturum sonunda."""
+            try:
+                excel_service.wifi_log_to_excel(file_path)
+            except Exception as e:
+                print(f"[ORCH] Wifi Excel uretilemedi: {e}")
 
         threading.Thread(target=_work, daemon=True).start()
 

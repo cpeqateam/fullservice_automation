@@ -30,7 +30,7 @@ import zipfile
 from datetime import datetime
 from typing import List, Optional
 
-from server import notify, log_collector, report_service
+from server import notify, report_service
 
 # GRK ile AYNI alıcılar
 TO_ADDRESSES = [
@@ -90,36 +90,23 @@ def _build_body(device: dict, start_time, end_time) -> str:
     )
 
 
-def send_completion(device: dict, session_id: str, start_time):
+def send_completion(device: dict, session_id: str, start_time,
+                    db_session_id=None, server_node_name: str | None = None):
     """Test bitince bildirim gönderimini ARKA PLANDA başlatır."""
     if os.environ.get("FS_NOTIFY_DISABLE"):
         print("[NOTIFY] FS_NOTIFY_DISABLE ayarli — bildirim atlandi.")
         return
     threading.Thread(
-        target=_worker, args=(dict(device), session_id, start_time), daemon=True
+        target=_worker,
+        args=(dict(device), session_id, start_time, db_session_id, server_node_name),
+        daemon=True,
     ).start()
 
 
-def _telegram_attachments(paths: List[str]) -> List[str]:
-    """Telegram'a GİDECEK dosyaları süzer (kullanıcı isteri — grup dosyaya boğulmasın):
-
-      • .xlsx  → gider   (bilgisayar başına ping özet + wifi analiz Excel'leri)
-      • iperf .txt → gider (iperf'in raporu zaten metindir)
-      • diğer .txt → GİTMEZ (ping/youtube/torrent/wifi ham logları; hepsi FTP'de ve
-        sunucunun logs/ klasöründe zaten duruyor)
-    """
-    keep = []
-    for p in paths or []:
-        name = os.path.basename(p).lower()
-        if name.endswith(".xlsx"):
-            keep.append(p)
-        elif name.endswith(".txt") and "iperf" in name:
-            keep.append(p)
-    return sorted(keep)
-
-
 def _zip_reports(paths: List[str], device: dict) -> Optional[str]:
-    """Telegram'a gidecek rapor dosyalarını (Excel + iperf) TEK bir .zip'te toplar.
+    """Telegram'a gidecek ÖZET EXCEL'leri TEK bir .zip'te toplar (ping özet, iperf
+    özet, wifi analiz). Ham .txt loglar Telegram'a GİTMEZ — hepsi FTP'de ve
+    sunucunun logs/ klasöründe tek tek indirilebilir halde durur.
     Zip yolunu döner; dosya yoksa None. Zip adı FULL Servis standardında:
         fullServis_raporlar_<marka>_<model>_<fw>_<YYYYMMDD_HHMMSS>.zip
     (kullanıcı isteri: Telegram'a tek tek dosya değil, tek zip gitsin)."""
@@ -145,28 +132,31 @@ def _zip_reports(paths: List[str], device: dict) -> Optional[str]:
         return None
 
 
-def _worker(device: dict, session_id: str, start_time):
-    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) bilgisayar başına ping
-    özet Excel'lerini üretir, oturumun rapor dosyalarını süzüp TEK ZIP yapar, tamamlanma
-    metnini kurup mail (metin) + Telegram (metin + tek zip) gönderir."""
+def _worker(device: dict, session_id: str, start_time,
+            db_session_id=None, server_node_name: str | None = None):
+    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) oturumu
+    sonlandırır — özet Excel'leri üretir, TÜM dosyaları FTP'ye yükler, DB'deki
+    ftp_file_path'leri gerçek dosya yoluyla günceller — sonra dönen Excel'leri TEK
+    ZIP yapıp mail (metin) + Telegram (metin + tek zip) gönderir."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
 
-    # Her bilgisayarın ping loglarından tek bir özet Excel üret (+ FTP'ye yükle).
-    # Excel'ler oturum klasörüne yazılır; aşağıdaki toplama onları da görür.
+    # Özet Excel üretimi + FTP yüklemesi + DB ftp_file_path güncellemesi.
+    # Telegram'a gidecek Excel listesini döner.
+    excels: List[str] = []
     try:
-        report_service.build_ping_summaries(session_id, device, start_time)
+        excels = report_service.finalize_session(
+            session_id, device, start_time, db_session_id, server_node_name)
     except Exception as e:
-        print(f"[NOTIFY] Ping ozet Excel'leri uretilemedi: {e}")
+        print(f"[NOTIFY] Oturum raporlari tamamlanamadi: {e}")
 
     end_time = datetime.now()
     body = _build_body(device, start_time, end_time)
 
-    # Süzülmüş rapor dosyalarını (Excel + iperf) tek zip'te topla
+    # Özet Excel'leri tek zip'te topla
     zip_path = None
     try:
-        attachments = _telegram_attachments(log_collector.list_session_files(session_id))
-        zip_path = _zip_reports(attachments, device)
+        zip_path = _zip_reports(excels, device)
     except Exception as e:
         print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
 

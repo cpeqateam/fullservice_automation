@@ -43,19 +43,48 @@ def _san(s) -> str:
     return re.sub(r'[\\/:*?"<>|]+', "_", s)
 
 
-def test_type_from_filename(filename: str) -> str:
-    """Log dosya adından test tipi klasörünü çözer (Ping/Iperf/Wifi/Youtube/Torrent)."""
-    n = (filename or "").lower()
-    if "iperf" in n:
+def _test_type_from_token(token: str) -> str:
+    """Dosya adının TEST ADI alanından test tipini çözer; tanınmazsa boş döner."""
+    t = (token or "").lower()
+    if t.startswith("iperf"):                      # iperf, iperfServer, iperfOzet
         return "Iperf"
-    if "ping" in n:
+    if t.startswith("ping"):                       # ping, pingOzet
         return "Ping"
-    if "wifi" in n or "wlan" in n:
+    if t.startswith("wifi") or t.startswith("wlan"):   # wifiAnaliz
         return "Wifi"
-    if "youtube" in n:
+    if t.startswith("youtube"):
         return "Youtube"
-    if "torrent" in n:
+    if t.startswith("torrent"):
         return "Torrent"
+    return ""
+
+
+def test_type_from_filename(filename: str) -> str:
+    """Log dosya adından test tipi klasörünü çözer (Ping/Iperf/Wifi/Youtube/Torrent).
+
+    ÖNCE dosya adının TEST ADI alanına bakar. FULL Servis standardı (bkz.
+    base.grk_style_filename):
+        fullServis_<testAdi>_<bilgisayar>_<marka>_<model>_<fw>..._<ts>.<uzanti>
+    Yani test adı 2. alandır. Bu şart: bilgisayar adları "macWifi"/"winWifi"
+    içerdiği için, tüm ada bakan basit bir arama `..._youtube_macWifi_...` gibi
+    bir dosyayı yanlışlıkla Wifi sayardı.
+
+    Standart dışı/eski adlarda tüm ada bakan yedek arama kullanılır; orada da
+    "wifi"/"wlan" EN SONA bırakılır (aynı nedenle — yalnızca gerçekten başka
+    hiçbir tipe uymayan adlar Wifi sayılsın)."""
+    name = os.path.basename(filename or "")
+    parts = os.path.splitext(name)[0].split("_")
+    if len(parts) >= 2:
+        by_token = _test_type_from_token(parts[1])
+        if by_token:
+            return by_token
+
+    n = name.lower()
+    for key, val in (("iperf", "Iperf"), ("ping", "Ping"),
+                     ("youtube", "Youtube"), ("torrent", "Torrent"),
+                     ("wifi", "Wifi"), ("wlan", "Wifi")):
+        if key in n:
+            return val
     return "Diger"
 
 
