@@ -30,21 +30,21 @@ import zipfile
 from datetime import datetime
 from typing import List, Optional
 
-from server import notify, report_service, log_capture
+from server import notify, report_service
 
 # GRK ile AYNI alıcılar
 TO_ADDRESSES = [
-    "erisimcihazlari@turktelekom.com.tr",
-    "samet.ozabaci@turktelekom.com.tr",
+    # "erisimcihazlari@turktelekom.com.tr",
+    # "samet.ozabaci@turktelekom.com.tr",
     "aliimran.atabey@partner.turktelekom.com.tr",
-    "ibrahim.sevinc@partner.turktelekom.com.tr",
-    "faruk.ozer@partner.turktelekom.com.tr",
+    # "ibrahim.sevinc@partner.turktelekom.com.tr",
+    # "faruk.ozer@partner.turktelekom.com.tr",
 ]
 CC_ADDRESSES = [
     "aliimranatabey@gmail.com",
     # "sametozabaci@gmail.com",
-    "farukozerr28@gmail.com",
-    "ttibrahimsevinc@gmail.com",
+    # "farukozerr28@gmail.com",
+    # "ttibrahimsevinc@gmail.com",
 ]
 
 TELEGRAM_DOC_LIMIT = 50 * 1024 * 1024   # 50 MB — Telegram API hard limiti
@@ -91,24 +91,14 @@ def _build_body(device: dict, start_time, end_time) -> str:
 
 
 def send_completion(device: dict, session_id: str, start_time,
-                    db_session_id=None, server_node_name: str | None = None,
-                    log_offset: int = 0):
-    """Test bitince oturum sonlandırmayı ARKA PLANDA başlatır (rapor+FTP+DB+bildirim
-    ve en sonda error_log)."""
+                    db_session_id=None, server_node_name: str | None = None):
+    """Test bitince bildirim gönderimini ARKA PLANDA başlatır."""
     if os.environ.get("FS_NOTIFY_DISABLE"):
         print("[NOTIFY] FS_NOTIFY_DISABLE ayarli — bildirim atlandi.")
-        # Bildirim kapalı olsa bile raporlar/FTP/DB ve error_log yine tamamlanmalı.
-        threading.Thread(
-            target=_worker,
-            args=(dict(device), session_id, start_time, db_session_id,
-                  server_node_name, log_offset, True),
-            daemon=True,
-        ).start()
         return
     threading.Thread(
         target=_worker,
-        args=(dict(device), session_id, start_time, db_session_id,
-              server_node_name, log_offset, False),
+        args=(dict(device), session_id, start_time, db_session_id, server_node_name),
         daemon=True,
     ).start()
 
@@ -143,15 +133,11 @@ def _zip_reports(paths: List[str], device: dict) -> Optional[str]:
 
 
 def _worker(device: dict, session_id: str, start_time,
-            db_session_id=None, server_node_name: str | None = None,
-            log_offset: int = 0, notify_disabled: bool = False):
-    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) oturumu
-    sonlandırır — özet Excel'leri üretir, TÜM dosyaları FTP'ye yükler, DB'deki
-    ftp_file_path'leri gerçek dosya yoluyla günceller — sonra dönen Excel'leri TEK
-    ZIP yapıp mail (metin) + Telegram (metin + tek zip) gönderir.
-
-    EN SON error_log üretilir: dilime buraya kadarki FTP/DB/bildirim satırları da
-    girsin diye (takılma/hata teşhisi için asıl değerli kısım orası)."""
+            db_session_id=None, server_node_name: str | None = None):
+    """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) bilgisayar başına
+    ping ve iperf özet Excel'lerini üretir (FTP'ye yükleyip DB'deki ftp_file_path'i
+    gerçek dosya yoluyla günceller), özet Excel'leri TEK ZIP yapar, tamamlanma
+    metnini kurup mail (metin) + Telegram (metin + tek zip) gönderir."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
 
@@ -164,32 +150,24 @@ def _worker(device: dict, session_id: str, start_time,
     except Exception as e:
         print(f"[NOTIFY] Oturum raporlari tamamlanamadi: {e}")
 
-    if not notify_disabled:
-        end_time = datetime.now()
-        body = _build_body(device, start_time, end_time)
+    end_time = datetime.now()
+    body = _build_body(device, start_time, end_time)
 
-        # Özet Excel'leri tek zip'te topla
-        zip_path = None
-        try:
-            zip_path = _zip_reports(excels, device)
-        except Exception as e:
-            print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
-
-        _send_email(body)             # mail: yalnızca metin (dosyasız)
-        _send_telegram(body, zip_path)  # telegram: metin + TEK zip
-        # Gönderim sonrası geçici zip'i temizle
-        if zip_path:
-            try:
-                os.remove(zip_path)
-            except OSError:
-                pass
-
-    # error_log: app.log'un bu oturuma ait dilimi → FTP + DB (indirilebilir olsun).
-    # Zaten arka plan thread'indeyiz; senkron sürüm yeni thread açmaz.
+    # Özet Excel'leri tek zip'te topla
+    zip_path = None
     try:
-        log_capture.finalize(device, session_id, start_time, log_offset, db_session_id)
+        zip_path = _zip_reports(excels, device)
     except Exception as e:
-        print(f"[NOTIFY] error_log uretilemedi: {e}")
+        print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
+
+    _send_email(body)             # mail: yalnızca metin (dosyasız)
+    _send_telegram(body, zip_path)  # telegram: metin + TEK zip
+    # Gönderim sonrası geçici zip'i temizle
+    if zip_path:
+        try:
+            os.remove(zip_path)
+        except OSError:
+            pass
 
 
 def _send_email(body: str):

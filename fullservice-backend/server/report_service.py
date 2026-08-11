@@ -1,25 +1,27 @@
 """
-Oturum sonu rapor servisi (sunucu tarafı) — özet Excel'leri üretir, TÜM oturum
-dosyalarını FTP'ye yükler ve DB'deki ftp_file_path'leri gerçek dosya yoluyla
+Oturum sonu rapor servisi (sunucu tarafı) — BİLGİSAYAR BAŞINA ping ve iperf özet
+Excel'i üretir, FTP'ye yükler ve DB'deki ftp_file_path'i gerçek dosya yoluyla
 günceller.
 
-Neden tek yerde? Test biterken yazılan DB satırı, dosya henüz FTP'ye gitmediği
-için yalnızca hedef KLASÖRü işaret ediyordu; test platformundaki "indir" butonu
-ise tam DOSYA yolu beklediğinden hata veriyordu. Yükleme ve DB güncellemesi
-artık burada, oturum sonunda, sırayla yapılır.
+Neden özet? Ping her makinede birden fazla log üretir (modem + internet, IPv4/IPv6).
+Her log için ayrı Excel göndermek Telegram'ı gereksiz dosyaya boğuyordu. GRK'da olduğu
+gibi (merge_parser.merge_ping_logs) tüm ping logları TEK bir özet Excel'de birleştirilir;
+FULL Servis dağıtık olduğu için bu özet HER BİLGİSAYAR İÇİN AYRI üretilir ve dosya adında
+bilgisayarın adı yer alır (LINUX / MAC_ETH / MAC_WIFI / WIN_WIFI). iperf için de aynı
+desende bir özet Excel (Grafik + DataLog) üretilir.
+
+Neden ftp_file_path burada güncelleniyor? Test biterken yazılan DB satırı, dosya
+henüz FTP'ye gitmediği için yalnızca hedef KLASÖRü işaret ediyordu; test
+platformundaki "indir" butonu ise tam DOSYA yolu bekliyor (GRK da öyle yazıyor).
 
 Akış (test bitince, notification_service._worker → finalize_session):
-  1) Özet Excel'ler üretilir (bilgisayar başına):
-       ping  logları → fullServis_pingOzet_<BILGISAYAR>_..._.xlsx
-       iperf logları → fullServis_iperfOzet_<BILGISAYAR>_..._.xlsx
-     (wifi Excel'i ham log yüklenirken zaten üretilmiştir)
-  2) Oturumun TÜM dosyaları (ham .txt + .xlsx) FTP'ye, test tipine göre
-     ayrılmış klasörlere yüklenir — zip DEĞİL, tek tek dosya olarak; böylece
-     test platformundan tek tek indirilebilir:
-       <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<BILGISAYAR>/<dosya>
-  3) DB'deki ping/iperf/wifi satırlarının ftp_file_path'i, o bilgisayarın
-     ÖZET Excel'inin tam FTP yoluyla güncellenir.
-  4) Telegram'a gidecek Excel listesi döner (zip'i notification_service yapar).
+  logs/<BILGISAYAR>/<session_id>/*ping*.txt  → fullServis_pingOzet_<BILGISAYAR>_...xlsx
+  logs/<BILGISAYAR>/<session_id>/*iperf*.txt → fullServis_iperfOzet_<BILGISAYAR>_...xlsx
+      → FTP: <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<BILGISAYAR>/
+      → DB : ilgili satırların ftp_file_path'i bu tam yolla güncellenir
+
+NOT: Ham loglar (ve wifi Excel'i) FTP'ye burada değil, test SIRASINDA log geldikçe
+yüklenir — bkz. orchestrator.upload_log_to_ftp.
 """
 from __future__ import annotations
 
@@ -106,66 +108,56 @@ def build_iperf_summaries(session_id: str, device: dict,
     return produced
 
 
-def upload_session_to_ftp(session_id: str, device: dict) -> dict[str, str]:
-    """Oturumun TÜM dosyalarını (ham .txt + .xlsx) FTP'ye, test tipine göre
-    ayrılmış klasörlere yükler. {yerel_yol: tam_ftp_yolu} döner.
-
-    Aynı klasöre gidecek dosyalar tek bağlantıda toplu gönderilir (her dosya için
-    yeniden bağlanmamak adına)."""
+def _upload_summary(local: str, device: dict, test_type: str, node_name: str) -> str | None:
+    """Bir özet Excel'ini FTP'ye yükler; başarılıysa TAM FTP yolunu döner.
+    (DB'deki ftp_file_path bu tam yolla güncellenir — indirme butonu bunu kullanır.)"""
     device = device or {}
-    brand, model, fw = device.get("brand"), device.get("model"), device.get("firmware")
-
-    groups: dict[str, list[str]] = {}          # hedef klasör → yerel dosyalar
-    mapping: dict[str, str] = {}               # yerel dosya → tam FTP yolu
-    for node_name, sdir in _session_dirs(session_id):
-        for fn in sorted(os.listdir(sdir)):
-            local = os.path.join(sdir, fn)
-            if not os.path.isfile(local):
-                continue
-            test_type = ftp_service.test_type_from_filename(fn)
-            target = ftp_service.build_target_dir(brand, model, fw, test_type, node_name)
-            groups.setdefault(target, []).append(local)
-            mapping[local] = f"{target}/{fn}"
-
-    total = 0
-    for target, files in sorted(groups.items()):
-        try:
-            ftp_service.upload_files_to_ftp(files, target)
-            total += len(files)
-        except Exception as e:
-            print(f"[RAPOR] FTP yukleme hatasi ({target}): {e}")
-    print(f"[RAPOR] FTP'ye yuklenen dosya sayisi: {total}")
-    return mapping
+    target = ftp_service.build_target_dir(
+        device.get("brand"), device.get("model"), device.get("firmware"),
+        test_type, node_name)
+    try:
+        ftp_service.upload_files_to_ftp([local], target)
+        return f"{target}/{os.path.basename(local)}"
+    except Exception as e:
+        print(f"[RAPOR] {node_name} {test_type} ozeti FTP'ye gonderilemedi: {e}")
+        return None
 
 
 def finalize_session(session_id: str, device: dict, start_time=None,
                      db_session_id=None, server_node_name: str | None = None) -> list[str]:
-    """Oturum sonu tüm rapor işini yapar; Telegram'a gidecek Excel yollarını döner.
+    """Oturum sonu rapor işini yapar; Telegram'a gidecek Excel yollarını döner.
 
-    Sıra önemlidir: önce özet Excel'ler üretilir (ki FTP taramasına dahil olsunlar),
-    sonra her şey FTP'ye yüklenir, en sonda DB'deki ftp_file_path'ler yüklenen
-    ÖZET dosyanın tam yoluyla güncellenir."""
+    Ham loglar (ve wifi Excel'i) FTP'ye zaten test sırasında, log geldikçe
+    yüklenir (orchestrator.upload_log_to_ftp). Burada yalnızca oturum sonunda
+    ÜRETİLEN özet Excel'ler yüklenir ve DB'deki ftp_file_path'ler bu dosyaların
+    TAM yoluyla güncellenir."""
     ping_x = build_ping_summaries(session_id, device, start_time)
     iperf_x = build_iperf_summaries(session_id, device, server_node_name)
 
-    uploaded = upload_session_to_ftp(session_id, device)
+    # Özet Excel'leri FTP'ye yükle + DB satırlarını tam dosya yoluyla güncelle.
+    for kind, test_type, produced in (("ping", "Ping", ping_x),
+                                      ("iperf", "Iperf", iperf_x)):
+        for node_name, local in produced.items():
+            remote = _upload_summary(local, device, test_type, node_name)
+            if remote and db_session_id:
+                db_service.update_ftp_file_path(db_session_id, kind, node_name, remote)
 
-    # DB satırlarını, o bilgisayarın özet dosyasının TAM FTP yoluyla güncelle.
-    # wifi'de ayrı bir "özet" yok — ham logdan üretilen .xlsx'in kendisi rapordur.
+    # wifi'de ayrı bir "özet" yok — ham logdan üretilen .xlsx'in kendisi rapordur ve
+    # FTP'ye test sırasında zaten yüklendi; burada yalnızca DB yolu yazılır.
     # Tip tespiti yüklemeyle AYNI fonksiyonla yapılır; aksi halde (ör. adında
     # "macWifi" geçen ping özeti) yanlış dosya wifi satırına yazılabilirdi.
     wifi_x: dict[str, str] = {}
     for node_name, sdir in _session_dirs(session_id):
         for fn in sorted(os.listdir(sdir)):
             if fn.lower().endswith(".xlsx") and ftp_service.test_type_from_filename(fn) == "Wifi":
-                wifi_x[node_name] = os.path.join(sdir, fn)
-
-    if db_session_id:
-        for kind, produced in (("ping", ping_x), ("iperf", iperf_x), ("wifi", wifi_x)):
-            for node_name, local in produced.items():
-                remote = uploaded.get(local)
-                if remote:
-                    db_service.update_ftp_file_path(db_session_id, kind, node_name, remote)
+                local = os.path.join(sdir, fn)
+                wifi_x[node_name] = local
+                if db_session_id:
+                    target = ftp_service.build_target_dir(
+                        (device or {}).get("brand"), (device or {}).get("model"),
+                        (device or {}).get("firmware"), "Wifi", node_name)
+                    db_service.update_ftp_file_path(
+                        db_session_id, "wifi", node_name, f"{target}/{fn}")
 
     # Telegram eki: yalnızca Excel'ler (ham .txt'ler FTP'de ve sunucuda duruyor)
     return sorted({*ping_x.values(), *iperf_x.values(), *wifi_x.values()})

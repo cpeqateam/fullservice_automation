@@ -68,13 +68,6 @@ def finalize_async(device: dict, session_id: str, start_time, start_offset: int,
     ).start()
 
 
-def finalize(device: dict, session_id: str, start_time, start_offset: int,
-             db_session_id=None):
-    """finalize_async'in senkron hali — çağıran zaten arka plan thread'indeyse
-    (bkz. notification_service._worker) yeni bir thread açmaya gerek yok."""
-    _worker(dict(device or {}), session_id, start_time, start_offset, db_session_id)
-
-
 def _worker(device: dict, session_id: str, start_time, start_offset: int,
             db_session_id=None):
     """Arka plan iş parçacığı: app.log'un bu oturuma ait dilimini `FULL_Service_errorlog_...`

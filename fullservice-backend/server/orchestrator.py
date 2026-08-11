@@ -171,20 +171,22 @@ class Orchestrator:
             self._on_session_complete(fire)
 
     def _on_session_complete(self, info: dict):
-        """Test bitince (lock dışında) oturumu sonlandırır: özet Excel'ler, FTP
-        yüklemesi, DB güncellemeleri, Telegram/mail bildirimi ve EN SON error_log.
-
-        Hepsi tek bir arka plan akışında (send_completion) sırayla yapılır.
-        error_log'un en sonda üretilmesi bilinçlidir: böylece dilime FTP yükleme
-        ve DB yazma sonuçları da girer — "FULL Servis bir yerde takıldı mı?"
-        sorusunun cevabı çoğunlukla tam olarak orada olur."""
+        """Test bitince (lock dışında): Telegram+mail bildirimi VE error_log'u FTP'ye."""
+        # 1) Özet Excel'ler + Telegram (mesaj + tek zip) + mail (sadece mesaj)
         try:
             notification_service.send_completion(
                 info["device"], info["session_id"], info["started_at"],
-                info.get("db_session_id"), self._iperf_server_node_name(),
-                info.get("log_offset", 0))
+                info.get("db_session_id"), self._iperf_server_node_name())
         except Exception as e:
-            print(f"[ORCH] Oturum sonlandirma baslatilamadi: {e}")
+            print(f"[ORCH] Bildirim baslatilamadi: {e}")
+        # 2) error_log dilimini FTP'ye yükle + DB'ye yolunu yaz (bildirim YOK —
+        #    sadece hata görünürlüğü / "Error Log İndir" butonu için)
+        try:
+            log_capture.finalize_async(
+                info["device"], info["session_id"], info["started_at"],
+                info["log_offset"], info.get("db_session_id"))
+        except Exception as e:
+            print(f"[ORCH] error_log gonderilemedi: {e}")
 
     # ── Dashboard durum çıktısı ──────────────────────────────
     def get_state(self) -> dict:
@@ -406,29 +408,41 @@ class Orchestrator:
             print(f"[ORCH] record_result hatasi ({kind}): {e}")
 
     def upload_log_to_ftp(self, node_id: str, file_path: str):
-        """Yeni gelen bir ham logu OTURUM SONUNA hazırlar (FTP'ye burada yüklemez).
+        """Bir log dosyasını FTP'ye, doğru klasör yapısına (arka planda) yükler:
+        <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/<TestTipi>/<Bilgisayar>/
 
-        Tek iş: WIFI ham logundan GRK formatındaki Excel'i (Veriler+Özet+10 grafik)
-        şimdiden üretmek. Matplotlib yavaş olduğu için bu iş teste yayılsın, oturum
-        sonunda topluca yapılıp bildirimi geciktirmesin diye arka plan thread'inde
-        koşar. Üretilen .xlsx ham logun yanına (oturum klasörüne) yazılır.
+        FTP'ye HER ŞEY gider (kullanıcı isteri): ham .txt loglar ve üretilen
+        Excel'ler, test tipine göre ayrılmış klasörlere TEK TEK dosya olarak
+        (zip değil) — böylece test platformundan tek tek indirilebilir.
+          • WIFI  → ham .txt VE ondan üretilen GRK formatındaki Excel
+                    (Veriler+Özet+10 grafik) birlikte gider.
+          • Diğer → dosya olduğu gibi gider.
 
-        FTP'ye yükleme ARTIK BURADA YAPILMAZ: oturum sonunda report_service
-        (upload_session_to_ftp) tüm dosyaları — ham .txt'ler ve Excel'ler dahil —
-        test tipine göre klasörlere tek seferde yükler. Böylece hem her şey FTP'ye
-        gider, hem aynı dosya iki kez yüklenmez, hem de DB'deki ftp_file_path
-        yüklemeden HEMEN SONRA gerçek dosya yoluyla güncellenebilir."""
+        Yükleme log geldikçe (teste yayılı) yapılır; oturum sonunu beklemez.
+        Excel üretimi + yükleme arka plan thread'inde yapılır (matplotlib yavaş
+        olabilir; HTTP yanıtını bloke etmesin).
+
+        Oturum sonunda üretilen ÖZET Excel'leri (ping/iperf) report_service
+        kendi yükler."""
         if not file_path:
             return
-        if ftp_service.test_type_from_filename(os.path.basename(file_path)) != "Wifi":
-            return
+        dev = self.session.get("device", {})
+        node_name = node_log_folder(node_id, self.config)
+        test_type = ftp_service.test_type_from_filename(os.path.basename(file_path))
+        target = ftp_service.build_target_dir(
+            dev.get("brand"), dev.get("model"), dev.get("firmware"), test_type, node_name)
 
         def _work():
-            """Wifi ham logundan Excel'i üretir (thread hedefi); yükleme oturum sonunda."""
-            try:
-                excel_service.wifi_log_to_excel(file_path)
-            except Exception as e:
-                print(f"[ORCH] Wifi Excel uretilemedi: {e}")
+            """Ham logu (wifi ise ayrıca ondan üretilen Excel'i) FTP'ye yükler (thread hedefi)."""
+            files = [file_path]
+            if test_type == "Wifi":
+                try:
+                    xlsx = excel_service.wifi_log_to_excel(file_path)
+                    if xlsx:
+                        files.append(xlsx)
+                except Exception as e:
+                    print(f"[ORCH] Wifi Excel uretilemedi: {e}")
+            ftp_service.upload_files_to_ftp(files, target)
 
         threading.Thread(target=_work, daemon=True).start()
 
