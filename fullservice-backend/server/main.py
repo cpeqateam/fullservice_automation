@@ -211,13 +211,25 @@ def health_check():
 
 # ── Firmware DB (Marka / Model / Firmware combobox'ları) ─────
 # DB erişilemezse 503 döner; frontend bunu serbest-metin girişine düşmek için kullanır.
+#
+# NOT (teşhis): SQLAlchemy'de create_engine() BAĞLANMAZ — bağlantı ilk sorguda
+# kurulur. Yani bağlantı hataları açılışta değil, BURADA ortaya çıkar. Hatayı
+# yalnızca 503 gövdesine koymak, konsolda/app.log'da hiç iz bırakmadığı için
+# "combobox boş ama sebebi görünmüyor" körlüğüne yol açıyordu; bu yüzden asıl
+# istisna ayrıca log'a da basılır (error_log'a da böylece girer).
+def _firmware_503(e: Exception, ne: str) -> HTTPException:
+    """Firmware DB hatasını log'a basar ve 503'e çevirir (tek yerden)."""
+    print(f"[FIRMWARE_DB] {ne} alinamadi: {type(e).__name__}: {e}")
+    return HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+
+
 @app.get("/api/firmware/brands")
 def firmware_brands():
     """Marka listesi (DB'den). DB yoksa 503 → frontend serbest-metne düşer."""
     try:
         return firmware_db.get_brands()
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+        raise _firmware_503(e, "marka listesi")
 
 
 @app.get("/api/firmware/models/{brand}")
@@ -226,7 +238,7 @@ def firmware_models(brand: str):
     try:
         return firmware_db.get_models(brand)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+        raise _firmware_503(e, f"model listesi ({brand})")
 
 
 @app.get("/api/firmware/versions/{brand}/{model}")
@@ -235,7 +247,7 @@ def firmware_versions(brand: str, model: str):
     try:
         return firmware_db.get_versions(brand, model)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Firmware DB erisilemiyor: {e}")
+        raise _firmware_503(e, f"firmware listesi ({brand}/{model})")
 
 
 # ── Dashboard (statik) ───────────────────────────────────────
