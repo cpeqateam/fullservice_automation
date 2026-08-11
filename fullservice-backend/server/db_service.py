@@ -187,6 +187,28 @@ def save_ping(session_id, node_name, stats: dict, ftp_file_path=None):
 _FTP_UPDATE_TABLES = {"ping": T_PING, "iperf": T_IPERF, "wifi": T_WIFI, "speed": T_SPEED}
 
 
+def update_session_error_log(session_id, error_log_ftp_path: str) -> bool:
+    """test_session.error_log_ftp_path'i, FTP'ye yüklenen error_log dosyasının TAM
+    yoluyla günceller — test platformundaki "Error Log İndir" butonu bunu kullanır."""
+    if not db_available() or not session_id or not error_log_ftp_path:
+        return False
+    from sqlalchemy import text
+    db = firmware_db.SessionLocal()
+    try:
+        db.execute(text(
+            f"UPDATE {T_SESSION} SET error_log_ftp_path = :err WHERE session_id = :sid"
+        ), {"err": error_log_ftp_path, "sid": session_id})
+        db.commit()
+        print(f"[DB] test_session.error_log_ftp_path guncellendi: {error_log_ftp_path}")
+        return True
+    except Exception as e:
+        db.rollback()
+        print(f"[DB] error_log_ftp_path guncellenemedi: {e}")
+        return False
+    finally:
+        db.close()
+
+
 def update_ftp_file_path(session_id, kind: str, node_name: str, ftp_file_path: str) -> int:
     """Bir oturumdaki (kind, node_name) satırlarının ftp_file_path'ini tam dosya
     yoluyla günceller. Güncellenen satır sayısını döner (DB yoksa 0)."""

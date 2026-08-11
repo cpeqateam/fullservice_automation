@@ -171,21 +171,20 @@ class Orchestrator:
             self._on_session_complete(fire)
 
     def _on_session_complete(self, info: dict):
-        """Test bitince (lock dışında): rapor+FTP+DB tamamlama ve Telegram+mail
-        bildirimi (hepsi send_completion içinde, arka planda) VE error_log'u FTP'ye."""
-        # 1) Özet Excel + FTP yükleme + DB ftp_file_path güncelleme + Telegram/mail
+        """Test bitince (lock dışında) oturumu sonlandırır: özet Excel'ler, FTP
+        yüklemesi, DB güncellemeleri, Telegram/mail bildirimi ve EN SON error_log.
+
+        Hepsi tek bir arka plan akışında (send_completion) sırayla yapılır.
+        error_log'un en sonda üretilmesi bilinçlidir: böylece dilime FTP yükleme
+        ve DB yazma sonuçları da girer — "FULL Servis bir yerde takıldı mı?"
+        sorusunun cevabı çoğunlukla tam olarak orada olur."""
         try:
             notification_service.send_completion(
                 info["device"], info["session_id"], info["started_at"],
-                info.get("db_session_id"), self._iperf_server_node_name())
+                info.get("db_session_id"), self._iperf_server_node_name(),
+                info.get("log_offset", 0))
         except Exception as e:
-            print(f"[ORCH] Bildirim baslatilamadi: {e}")
-        # 2) error_log dilimini FTP'ye yükle (bildirim YOK — sadece hata görünürlüğü)
-        try:
-            log_capture.finalize_async(
-                info["device"], info["session_id"], info["started_at"], info["log_offset"])
-        except Exception as e:
-            print(f"[ORCH] error_log gonderilemedi: {e}")
+            print(f"[ORCH] Oturum sonlandirma baslatilamadi: {e}")
 
     # ── Dashboard durum çıktısı ──────────────────────────────
     def get_state(self) -> dict:

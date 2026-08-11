@@ -57,17 +57,29 @@ def _slice_to(dest_path: str, start_offset: int) -> bool:
         return False
 
 
-def finalize_async(device: dict, session_id: str, start_time, start_offset: int):
-    """error_log dilimini arka planda üretip FTP'ye yükler (bildirim YOK)."""
+def finalize_async(device: dict, session_id: str, start_time, start_offset: int,
+                   db_session_id=None):
+    """error_log dilimini arka planda üretip FTP'ye yükler (bildirim YOK) ve
+    DB'deki test_session.error_log_ftp_path'i tam dosya yoluyla günceller."""
     threading.Thread(
-        target=_worker, args=(dict(device or {}), session_id, start_time, start_offset),
+        target=_worker,
+        args=(dict(device or {}), session_id, start_time, start_offset, db_session_id),
         daemon=True,
     ).start()
 
 
-def _worker(device: dict, session_id: str, start_time, start_offset: int):
+def finalize(device: dict, session_id: str, start_time, start_offset: int,
+             db_session_id=None):
+    """finalize_async'in senkron hali — çağıran zaten arka plan thread'indeyse
+    (bkz. notification_service._worker) yeni bir thread açmaya gerek yok."""
+    _worker(dict(device or {}), session_id, start_time, start_offset, db_session_id)
+
+
+def _worker(device: dict, session_id: str, start_time, start_offset: int,
+            db_session_id=None):
     """Arka plan iş parçacığı: app.log'un bu oturuma ait dilimini `FULL_Service_errorlog_...`
-    dosyasına yazıp FTP'deki Errorlog klasörüne yükler (bildirim göndermez)."""
+    dosyasına yazıp FTP'deki Errorlog klasörüne yükler (bildirim göndermez), sonra
+    DB'ye tam FTP yolunu yazar ki platformdan indirilebilsin."""
     brand    = device.get("brand") or "Unknown"
     model    = device.get("model") or "Unknown"
     firmware = device.get("firmware") or "Unknown"
@@ -82,9 +94,19 @@ def _worker(device: dict, session_id: str, start_time, start_offset: int):
 
     # Hedef: <MARKA>/<MODEL>/<FIRMWARE>/FULLSERVIS/Errorlog  (makine alt klasörü yok)
     target_dir = "/".join([_s(brand), _s(model), _s(firmware), "FULLSERVIS", "Errorlog"])
+    remote_path = f"{target_dir}/{filename}"
 
     try:
         ftp_service.upload_files_to_ftp([local_path], target_dir)
-        print(f"[LOG_CAPTURE] error_log FTP'ye gonderildi: {target_dir}/{filename}")
+        print(f"[LOG_CAPTURE] error_log FTP'ye gonderildi: {remote_path}")
     except Exception as e:
         print(f"[LOG_CAPTURE] FTP yukleme hatasi: {e}")
+        return                      # yüklenemediyse DB'ye yol yazma (indirme kirilmasin)
+
+    # DB: "Error Log İndir" butonu bu tam yolu kullanır.
+    if db_session_id:
+        try:
+            from server import db_service
+            db_service.update_session_error_log(db_session_id, remote_path)
+        except Exception as e:
+            print(f"[LOG_CAPTURE] error_log DB yolu yazilamadi: {e}")

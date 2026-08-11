@@ -30,7 +30,7 @@ import zipfile
 from datetime import datetime
 from typing import List, Optional
 
-from server import notify, report_service
+from server import notify, report_service, log_capture
 
 # GRK ile AYNI alıcılar
 TO_ADDRESSES = [
@@ -91,14 +91,24 @@ def _build_body(device: dict, start_time, end_time) -> str:
 
 
 def send_completion(device: dict, session_id: str, start_time,
-                    db_session_id=None, server_node_name: str | None = None):
-    """Test bitince bildirim gönderimini ARKA PLANDA başlatır."""
+                    db_session_id=None, server_node_name: str | None = None,
+                    log_offset: int = 0):
+    """Test bitince oturum sonlandırmayı ARKA PLANDA başlatır (rapor+FTP+DB+bildirim
+    ve en sonda error_log)."""
     if os.environ.get("FS_NOTIFY_DISABLE"):
         print("[NOTIFY] FS_NOTIFY_DISABLE ayarli — bildirim atlandi.")
+        # Bildirim kapalı olsa bile raporlar/FTP/DB ve error_log yine tamamlanmalı.
+        threading.Thread(
+            target=_worker,
+            args=(dict(device), session_id, start_time, db_session_id,
+                  server_node_name, log_offset, True),
+            daemon=True,
+        ).start()
         return
     threading.Thread(
         target=_worker,
-        args=(dict(device), session_id, start_time, db_session_id, server_node_name),
+        args=(dict(device), session_id, start_time, db_session_id,
+              server_node_name, log_offset, False),
         daemon=True,
     ).start()
 
@@ -133,11 +143,15 @@ def _zip_reports(paths: List[str], device: dict) -> Optional[str]:
 
 
 def _worker(device: dict, session_id: str, start_time,
-            db_session_id=None, server_node_name: str | None = None):
+            db_session_id=None, server_node_name: str | None = None,
+            log_offset: int = 0, notify_disabled: bool = False):
     """Arka plan iş parçacığı: kısa bekleyip (log upload'ları için) oturumu
     sonlandırır — özet Excel'leri üretir, TÜM dosyaları FTP'ye yükler, DB'deki
     ftp_file_path'leri gerçek dosya yoluyla günceller — sonra dönen Excel'leri TEK
-    ZIP yapıp mail (metin) + Telegram (metin + tek zip) gönderir."""
+    ZIP yapıp mail (metin) + Telegram (metin + tek zip) gönderir.
+
+    EN SON error_log üretilir: dilime buraya kadarki FTP/DB/bildirim satırları da
+    girsin diye (takılma/hata teşhisi için asıl değerli kısım orası)."""
     # Agent'ların son log upload'larını tamamlaması için kısa bekleme
     time.sleep(GRACE_SECONDS)
 
@@ -150,24 +164,32 @@ def _worker(device: dict, session_id: str, start_time,
     except Exception as e:
         print(f"[NOTIFY] Oturum raporlari tamamlanamadi: {e}")
 
-    end_time = datetime.now()
-    body = _build_body(device, start_time, end_time)
+    if not notify_disabled:
+        end_time = datetime.now()
+        body = _build_body(device, start_time, end_time)
 
-    # Özet Excel'leri tek zip'te topla
-    zip_path = None
-    try:
-        zip_path = _zip_reports(excels, device)
-    except Exception as e:
-        print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
-
-    _send_email(body)             # mail: yalnızca metin (dosyasız)
-    _send_telegram(body, zip_path)  # telegram: metin + TEK zip
-    # Gönderim sonrası geçici zip'i temizle
-    if zip_path:
+        # Özet Excel'leri tek zip'te topla
+        zip_path = None
         try:
-            os.remove(zip_path)
-        except OSError:
-            pass
+            zip_path = _zip_reports(excels, device)
+        except Exception as e:
+            print(f"[NOTIFY] Rapor dosyalari toplanamadi: {e}")
+
+        _send_email(body)             # mail: yalnızca metin (dosyasız)
+        _send_telegram(body, zip_path)  # telegram: metin + TEK zip
+        # Gönderim sonrası geçici zip'i temizle
+        if zip_path:
+            try:
+                os.remove(zip_path)
+            except OSError:
+                pass
+
+    # error_log: app.log'un bu oturuma ait dilimi → FTP + DB (indirilebilir olsun).
+    # Zaten arka plan thread'indeyiz; senkron sürüm yeni thread açmaz.
+    try:
+        log_capture.finalize(device, session_id, start_time, log_offset, db_session_id)
+    except Exception as e:
+        print(f"[NOTIFY] error_log uretilemedi: {e}")
 
 
 def _send_email(body: str):
