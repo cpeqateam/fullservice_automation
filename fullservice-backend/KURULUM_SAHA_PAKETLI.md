@@ -430,9 +430,11 @@ Linux'taki `FULLSERVIS-SUNUCU/ayarlar/` klasörüne şunları koy (repoda YOK, U
 - `secrets.json` → Telegram + mail bildirimi için
 - `certs/` (`ca.crt`, `client.crt`, `client.key`) → FTP + DB yazımı için
 
-`secrets.json` içeriği:
+`secrets.json` içeriği (`FS_FIRMWARE_DB_URL` DB bağlantısı için ZORUNLU —
+Marka/Model/Firmware combobox'larını o besler):
 ```json
 {
+  "FS_FIRMWARE_DB_URL": "postgresql://...",
   "FS_TELEGRAM_BOT_TOKEN": "...",
   "FS_TELEGRAM_CHAT_ID": -4802883729,
   "FS_SMTP_USER": "cpetestteam",
@@ -440,6 +442,16 @@ Linux'taki `FULLSERVIS-SUNUCU/ayarlar/` klasörüne şunları koy (repoda YOK, U
   "FS_SMTP_FROM": "cpetestteam@gmail.com"
 }
 ```
+
+**Kopyaladıktan sonra sertifika izinlerini düzelt** (USB/dosya yöneticisiyle
+kopyalama izinleri 777 yapar; libpq dünyaya açık özel anahtarla bağlanmayı
+reddeder → combobox'lar boş gelir):
+```bash
+chmod 600 ayarlar/certs/client.key
+chmod 644 ayarlar/certs/ca.crt ayarlar/certs/client.crt
+ls -la ayarlar/certs        # client.key -rw------- olmali
+```
+
 > Bunlar olmadan **testler yine çalışır**, sadece Telegram/mail bildirimi ve DB
 > kaydı yapılmaz. Marka/Model/Firmware listeleri de DB'den gelir; DB'ye ulaşılamazsa
 > alanları elle (serbest metin) girersin.
@@ -538,9 +550,22 @@ içinde yalnızca repodaki varsayılan `config.json` olur; **senin** ayarların
 (özellikle Linux'ta `secrets.json` + `certs/`) 2. adımdaki yedekte:
 ```bash
 cp -r /tmp/ayarlar_yedek/. ../FULLSERVIS-SUNUCU/ayarlar/
-ls ../FULLSERVIS-SUNUCU/ayarlar ../FULLSERVIS-SUNUCU/ayarlar/certs
+# ⚠️ SERTIFIKA IZINLERI — kopyalama sonrasi HER ZAMAN calistir (asagidaki nota bak)
+chmod 600 ../FULLSERVIS-SUNUCU/ayarlar/certs/client.key
+chmod 644 ../FULLSERVIS-SUNUCU/ayarlar/certs/ca.crt ../FULLSERVIS-SUNUCU/ayarlar/certs/client.crt
+ls -la ../FULLSERVIS-SUNUCU/ayarlar ../FULLSERVIS-SUNUCU/ayarlar/certs
 ```
 ⚠️ Bu adımı atlarsan Linux'ta Telegram/mail/DB/FTP sessizce çalışmaz.
+
+> **`client.key` izni neden önemli?** PostgreSQL istemcisi (libpq), özel anahtar
+> dosyası grup/dünya tarafından okunabiliyorsa bağlantıyı **reddeder**. Dosya
+> yöneticisiyle kopyala-yapıştır (özellikle USB/Windows disk üzerinden) izinleri
+> `-rwxrwxrwx` (777) yapar ve DB bağlantısı sessizce kurulamaz. Belirtisi:
+> **Marka/Model/Firmware combobox'ları boş gelir** (arayüz serbest-metne düşer)
+> ve sunucu konsolunda açılışta şu satır olur:
+> `[FIRMWARE_DB] Veritabani baglantisi yapilandirilamadi: ...`
+> Bağlantı yalnızca **açılışta bir kez** kurulur — izni düzelttikten sonra
+> uygulamayı **kapatıp yeniden aç**, yoksa düzelme etkili olmaz.
 
 **7) Kaynak kodu tekrar sil** (A.4) ve **8) uygulamayı bir kez çalıştırıp**
 panelde o makinenin **yeşil** olduğunu doğrula.
@@ -565,7 +590,7 @@ panelde o makinenin **yeşil** olduğunu doğrula.
 | Panel tarayıcıda açılmadı | Elle yaz: `http://192.168.1.10:8770` |
 | **iperf** kırmızı/hatalı | mac_cable açık mı? iki Mac'te de iperf3 kurulu mu? |
 | **torrent** hatası | Windows'ta qBittorrent açık mı? Web UI 8080 / admin / Admin123, "Bypass auth" kapalı mı? |
-| **Marka/Model boş** | Linux `ayarlar/certs/` ve `secrets.json` var mı? (Sistem yine çalışır, alanları elle yaz.) |
+| **Marka/Model/Firmware combobox'ları boş** | DB bağlantısı açılışta kurulamamış. Sunucu konsolunun ilk satırlarında `[FIRMWARE_DB] Veritabani baglantisi yapilandirilamadi: ...` var mı, bak — asıl sebebi orası yazar. Sık sebepler: **1)** `ayarlar/certs/client.key` izni 777 (kopyala-yapıştır sonrası) → `chmod 600 ayarlar/certs/client.key`, **2)** `ayarlar/secrets.json` yok ya da `FS_FIRMWARE_DB_URL` boş, **3)** `ayarlar/ayarlar/...` gibi iç içe klasör oluşmuş, **4)** DB'de `too many clients already`. Düzelttikten sonra **uygulamayı kapatıp yeniden aç** — bağlantı yalnızca açılışta kurulur. (Sistem yine çalışır, alanları elle yazabilirsin.) |
 | **Telegram/mail gelmiyor** | Linux `ayarlar/secrets.json` dolu mu? `FS_NOTIFY_DISABLE=1` ayarlı olmasın. |
 | **FTP'ye yüklenmiyor** | Linux `ayarlar/certs/` var mı? `FS_FTP_DISABLE=1` ayarlı olmasın. |
 | Giriş yapılamıyor | DB kapalı olsa bile `cpeteam`/`cpeteam` her zaman çalışır. |
