@@ -34,17 +34,17 @@ from server import notify, report_service
 
 # GRK ile AYNI alıcılar
 TO_ADDRESSES = [
-    # "erisimcihazlari@turktelekom.com.tr",
-    # "samet.ozabaci@turktelekom.com.tr",
+    "erisimcihazlari@turktelekom.com.tr",
+    "samet.ozabaci@turktelekom.com.tr",
     "aliimran.atabey@partner.turktelekom.com.tr",
-    # "ibrahim.sevinc@partner.turktelekom.com.tr",
-    # "faruk.ozer@partner.turktelekom.com.tr",
+    "ibrahim.sevinc@partner.turktelekom.com.tr",
+    "faruk.ozer@partner.turktelekom.com.tr",
 ]
 CC_ADDRESSES = [
     "aliimranatabey@gmail.com",
     # "sametozabaci@gmail.com",
-    # "farukozerr28@gmail.com",
-    # "ttibrahimsevinc@gmail.com",
+    "farukozerr28@gmail.com",
+    "ttibrahimsevinc@gmail.com",
 ]
 
 TELEGRAM_DOC_LIMIT = 50 * 1024 * 1024   # 50 MB — Telegram API hard limiti
