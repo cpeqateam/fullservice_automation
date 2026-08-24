@@ -27,13 +27,10 @@ pandas
 numpy
 matplotlib
 
-# macOS'ta Wi-Fi track icin ZORUNLU: CoreWLAN (Apple resmi Wi-Fi API'si) — kartin
-# anlik durumunu TARAMASIZ okur, Windows'taki "netsh wlan show interfaces" gibi.
-# YEDEK YOL YOK: kurulu degilse Wi-Fi izleme testi baslamaz ve net hata verir.
-# (Eski yedek system_profiler'di; WI-FI TARAMASI yaptigi icin ayni karttan akan
-#  iperf trafigini 630 -> 201 Mbit/sn'ye dusuruyordu, bu yuzden kaldirildi.)
-'# BU SATIR BILEREK YORUMDA. Yalnizca wifi_track ROLU OLAN Mac'te (mac_wifi) gerekli;
-# mac_cable'da gereksiz ve bazi makinelerde kurulumu patliyor (hazir wheel yoksa
-# kaynaktan derlemeye kalkiyor). derle-mac.sh bunu AYRI olarak, hata tolere ederek
-# kurar. Elle kurmak icin:  pip install pyobjc-framework-CoreWLAN
-# pyobjc-framework-CoreWLAN; sys_platform == "darwin"
+# macOS Wi-Fi track icin: CoreWLAN (pyobjc-framework-CoreWLAN)
+# BILEREK BU LISTEDE DEGIL. Yalnizca wifi_track rolu olan Mac'te (mac_wifi) gerekir
+# ve bazi makinelerde kurulumu patliyor. ELLE, TEK SEFERLIK kurulur:
+#     pip install pyobjc-framework-CoreWLAN
+# Patlarsa:
+#     pip install 'pyobjc-framework-CoreWLAN<11'
+# Kurulu degilse yalnizca Wi-Fi Analiz testi hata verir; diger testler etkilenmez.
