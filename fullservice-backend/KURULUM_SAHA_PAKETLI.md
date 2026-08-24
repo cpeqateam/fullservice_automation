@@ -567,6 +567,14 @@ ls -la ../FULLSERVIS-SUNUCU/ayarlar ../FULLSERVIS-SUNUCU/ayarlar/certs
 > Bağlantı yalnızca **açılışta bir kez** kurulur — izni düzelttikten sonra
 > uygulamayı **kapatıp yeniden aç**, yoksa düzelme etkili olmaz.
 
+**6.5) SADECE MAC'LERDE — CoreWLAN doğrula.** Derleme sırasında otomatik kurulur,
+ama kurulmadıysa Wi-Fi Analiz testi hiç başlamaz (sessizce yanlış ölçmesin diye).
+Kaynak klasörü silmeden önce, `fullservice-backend` içinde:
+```bash
+source venv/bin/activate && python -c "import CoreWLAN; print('OK')"
+```
+`OK` yazmıyorsa: `pip install -r requirements.txt` çalıştır, tekrar dene.
+
 **7) Kaynak kodu tekrar sil** (A.4) ve **8) uygulamayı bir kez çalıştırıp**
 panelde o makinenin **yeşil** olduğunu doğrula.
 

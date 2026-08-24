@@ -23,6 +23,15 @@ echo "[1/4] Bagimliliklar kontrol ediliyor..."
 "$PY" -m pip install --quiet --disable-pip-version-check -r "$REPO/fullservice-backend/requirements.txt"
 "$PY" -m pip install --quiet --disable-pip-version-check pyinstaller
 
+# CoreWLAN yalnizca wifi_track rolu olan Mac'te (mac_wifi) gerekir. Kurulumu bazi
+# makinelerde patliyor (hazir wheel yoksa kaynaktan derlemeye kalkiyor); o yuzden
+# AYRI kuruluyor ve HATA DERLEMEYI DURDURMUYOR.
+if ! "$PY" -m pip install --quiet --disable-pip-version-check pyobjc-framework-CoreWLAN 2>/dev/null; then
+    echo "  UYARI: CoreWLAN kurulamadi. Bu makine wifi_track KOSMUYORSA sorun degil."
+    echo "         wifi_track kosuyorsa (mac_wifi) once sunu dene:"
+    echo "           pip install 'pyobjc-framework-CoreWLAN<11'"
+fi
+
 echo "[2/4] Eski cikti temizleniyor..."
 rm -rf build dist cikti/FULLSERVIS-MAC-WIFI cikti/FULLSERVIS-MAC-KABLO
 

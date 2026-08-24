@@ -32,4 +32,8 @@ matplotlib
 # YEDEK YOL YOK: kurulu degilse Wi-Fi izleme testi baslamaz ve net hata verir.
 # (Eski yedek system_profiler'di; WI-FI TARAMASI yaptigi icin ayni karttan akan
 #  iperf trafigini 630 -> 201 Mbit/sn'ye dusuruyordu, bu yuzden kaldirildi.)
-pyobjc-framework-CoreWLAN; sys_platform == "darwin"
+'# BU SATIR BILEREK YORUMDA. Yalnizca wifi_track ROLU OLAN Mac'te (mac_wifi) gerekli;
+# mac_cable'da gereksiz ve bazi makinelerde kurulumu patliyor (hazir wheel yoksa
+# kaynaktan derlemeye kalkiyor). derle-mac.sh bunu AYRI olarak, hata tolere ederek
+# kurar. Elle kurmak icin:  pip install pyobjc-framework-CoreWLAN
+# pyobjc-framework-CoreWLAN; sys_platform == "darwin"
