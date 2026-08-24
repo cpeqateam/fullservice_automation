@@ -33,3 +33,20 @@ grk-automation/
 grk-test-platform/
 
 image.png
+
+# ── Depoya girmemesi gereken calisma dosyalari ──────────────────────────────
+# Sunumlar (~20 MB) — kod deposunun isi degil, paylasimi ayri yapilir
+*.pptx
+
+# Ornek/gecici Excel ciktilari (iperf ozet ornegi vb.)
+*.xlsx
+
+# Derlenmis ikili dosyalar — kaynagi repoda yok, makineye ozel (Mach-O intel/arm)
+client_intel
+client_m1
+
+# Tek basina duran yardimci scriptler — sistemin parcasi degil, hicbir yerden
+# cagrilmiyor. (ornek_mac_script.py: system_profiler sorununu anlatan demo;
+# iperf_visualizer_macos.py: elle calistirilailan gorsellestirici.)
+ornek_mac_script.py
+iperf_visualizer_macos.py

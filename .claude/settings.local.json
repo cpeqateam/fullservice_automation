@@ -56,7 +56,31 @@
       "Bash(python -m py_compile common/runners/wifi_track_runner.py)",
       "Bash(git log *)",
       "Bash(git filter-repo *)",
-      "Bash(pip show *)"
+      "Bash(pip show *)",
+      "Bash(./venv/bin/python -c \"import pandas, xlsxwriter, matplotlib, openpyxl; print\\('ok', pandas.__version__\\)\")",
+      "Bash(venv/bin/pip list *)",
+      "Bash(venv/bin/python --version)",
+      "Bash(venv/bin/pip install *)",
+      "Bash(python3 - /private/tmp/claude-501/-Users-aliimranatabey-vscode-workspace-fullservice-automation/82adea71-5a38-42b9-9e5b-e5d7742e88d3/scratchpad/sample_iperf_success.txt)",
+      "Bash(venv/bin/python /private/tmp/claude-501/-Users-aliimranatabey-vscode-workspace-fullservice-automation/82adea71-5a38-42b9-9e5b-e5d7742e88d3/scratchpad/demo_iperf_excel.py)",
+      "Bash(venv/bin/python -)",
+      "Bash(git -C /Users/aliimranatabey/vscode-workspace/fullservice_automation status --short)",
+      "Bash(git -C /Users/aliimranatabey/vscode-workspace/fullservice_automation diff --stat .claude/settings.local.json)",
+      "Bash(git status *)",
+      "Bash(git -C /Users/aliimranatabey/vscode-workspace/fullservice_automation diff --stat fullservice-backend/server/excel_service.py)",
+      "Bash(python3 -c \"import pptx; print\\(pptx.__version__\\)\")",
+      "Bash(pip install *)",
+      "Bash(python3)",
+      "Bash(python3 /private/tmp/claude-501/-Users-aliimranatabey-vscode-workspace-fullservice-automation/669aa07e-f090-4b8a-8919-22841b09fa6c/scratchpad/build_pptx.py)",
+      "Bash(grep -n \"sender_mbps = next\\\\|_IPERF_STATS_KEYS = \\\\[\\\\|status, error_message\\\\|def _parse_iperf_log\\\\|return {\" /Users/aliimranatabey/vscode-workspace/fullservice_automation/fullservice-backend/server/excel_service.py)",
+      "Bash(mkdir -p /private/tmp/claude-501/-Users-aliimranatabey-vscode-workspace-fullservice-automation/82adea71-5a38-42b9-9e5b-e5d7742e88d3/scratchpad/xlsx_extract)",
+      "Bash(unzip -o -q /private/tmp/claude-501/-Users-aliimranatabey-vscode-workspace-fullservice-automation/82adea71-5a38-42b9-9e5b-e5d7742e88d3/scratchpad/fullServis_iperfOzet_macWifi_TP-LINK_EX20V_260326_20260729_145959.xlsx -d extracted)",
+      "Bash(python3 -c \"from ctypes import wintypes\")",
+      "Bash(env)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('fullservice-backend/server/excel_service.py'\\).read\\(\\)\\)\")",
+      "Bash(ls -la /Users/aliimranatabey/Downloads/ 2>/dev/null | grep -i iperf *)",
+      "Read(//Users/aliimranatabey/Downloads//**)",
+      "Read(//Users/aliimranatabey/Downloads/**)"
     ]
   }
 }

@@ -16,6 +16,7 @@ Excel/DB kütüphaneleri (pandas, matplotlib, sqlalchemy…) agent'ta GEREKMEZ �
 excluded: dosya boyutu ~4 kat küçülür, açılış hızlanır.
 """
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -34,6 +35,11 @@ hiddenimports = (
     + collect_submodules("selenium")       # YouTube testi (kalite seçimi)
     + ["psutil", "requests", "multipart", "fastapi", "pydantic"]
 )
+
+# macOS agent'i Wi-Fi track icin CoreWLAN'a MECBUR (yedek yol kaldirildi).
+# Paket icine girmezse uygulama acilir ama Wi-Fi izleme testi hata verir.
+if sys.platform == "darwin":
+    hiddenimports += ["CoreWLAN", "objc", "Foundation"]
 
 a = Analysis(
     [os.path.join(HERE, "agent_app.py")],

@@ -129,3 +129,53 @@ def get_versions(brand: str, model: str) -> list[str]:
         "ORDER BY firmware_version",
         {"b": brand, "m": model},
     )
+
+
+def ensure_version(brand: str, model: str, firmware_version: str) -> tuple[str, bool]:
+    """Verilen sürümü DB'de arar; yoksa `firmware` tablosuna EKLER.
+
+    Döner: (firmware_version, was_added)
+      - Kayıt zaten varsa      → (sürüm, False)
+      - Yoksa ve eklendiyse    → (sürüm, True)
+      - DB yoksa / hata olursa → (sürüm, False)  — kullanıcı yine değeri görür,
+        sadece listeye eklenmez (GRK ile aynı davranış).
+
+    Karşılaştırma büyük/küçük harf ve baştaki-sondaki boşluklardan bağımsızdır.
+    """
+    if SessionLocal is None:
+        print("[FIRMWARE_DB] DB baglantisi yok, surum eklenmedi.")
+        return firmware_version, False
+
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        row = db.execute(
+            text(
+                "SELECT 1 FROM firmware "
+                "WHERE LOWER(TRIM(brand)) = LOWER(TRIM(:brand)) "
+                "AND LOWER(TRIM(model)) = LOWER(TRIM(:model)) "
+                "AND LOWER(TRIM(firmware_version)) = LOWER(TRIM(:fw)) "
+                "LIMIT 1"
+            ),
+            {"brand": brand, "model": model, "fw": firmware_version},
+        ).fetchone()
+
+        if row:
+            return firmware_version, False
+
+        db.execute(
+            text(
+                "INSERT INTO firmware (brand, model, firmware_version) "
+                "VALUES (:brand, :model, :fw)"
+            ),
+            {"brand": brand, "model": model, "fw": firmware_version},
+        )
+        db.commit()
+        print(f"[FIRMWARE_DB] DB'ye eklendi: {brand}/{model}/{firmware_version}")
+        return firmware_version, True
+
+    except Exception as e:
+        print(f"[FIRMWARE_DB] Surum kontrol/insert hatasi: {type(e).__name__}: {e}")
+        return firmware_version, False
+    finally:
+        db.close()

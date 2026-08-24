@@ -4,7 +4,7 @@ okuyup log'a yazar.
 
 Ölçüm ve satır formatı GRK functionBase_wifi.py ile BİREBİR AYNIDIR:
   • Windows → [wifi_util.py] (netsh)        ← GRK scriptinin aynısı
-  • macOS   → [wifi_util_mac.py] (system_profiler) ← GRK scriptinin macOS kolu
+  • macOS   → [wifi_util_mac.py] (CoreWLAN)  ← GRK scriptinin macOS kolu
 Her saniye bir örnek alınır; satır GRK'nın getPeriodicData satırıyla bayt bayt
 aynı biçimde yazılır. Ayrıca özet (DB için) hesaplanır. FULL Servis'e özgü olan
 tek şey döngü kontrolüdür (durdurma/ilerleme/canlı pencere/DB) — ölçüm değerleri
@@ -120,6 +120,12 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
     # Platforma uygun WLAN okuyucu (her ikisi de GRK'nın scriptinin aynısı)
     if is_mac():
         from common.runners import wifi_util_mac as wu
+        # CoreWLAN yoksa macOS'ta WLAN okunamaz. Testi boş satırlarla doldurup
+        # sahte bir özet üretmektense BAŞLAMADAN durduruyoruz: aşağıdaki döngü
+        # okuma hatalarını yutup boş örnek yazdığı için, buradaki kontrol
+        # olmazsa hata sessizce yanlış veriye dönüşürdü.
+        if not wu.is_available():
+            raise RuntimeError(wu._yok_mesaji())
     else:
         wu = wifi_util
 
@@ -145,11 +151,12 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
             ctx.result("wifi", _aggregate(samples, start_iso, end_iso))
 
     try:
-        # ÖNEMLİ: döngü örnek SAYISINA değil GERÇEK SÜREYE bağlıdır. macOS'ta WLAN
-        # okuması (system_profiler) çağrı başına birkaç saniye sürer; "1 örnek/sn"
-        # varsayımı orada testi 'duration' yerine kat kat uzatıp tamamlanmamış
-        # gösteriyordu. Artık test her platformda ~'duration' saniyede biter
-        # (Windows'ta ~1 örnek/sn; macOS'ta okuma kadar daha az örnek).
+        # ÖNEMLİ: döngü örnek SAYISINA değil GERÇEK SÜREYE bağlıdır — test her
+        # platformda ~'duration' saniyede biter, Windows ile macOS AYNI ANDA tamamlanır.
+        # (Bu kural DEĞİŞMEZ: okuma yavaşlarsa örnek sayısı düşer, süre uzamaz.)
+        # macOS artık CoreWLAN ile ~6 ms'de okuyor (eski system_profiler ~7 sn sürüyor
+        # ve Wi-Fi taraması yaptığı için iperf'i yavaşlatıyordu), bu yüzden orada da
+        # Windows gibi ~1 örnek/sn üretilir.
         loop_start = time.time()
         i = 0
         stopped = False
@@ -180,7 +187,7 @@ def run(params: TestParams, ctx: RunContext) -> list[str]:
                          f"Wi-Fi analizi {min(int(elapsed), duration)}/{duration} sn ({i} ornek)")
 
             # Hızlı okuma (Windows netsh) ise saniyeye tamamla → ~1 örnek/sn.
-            # Yavaş okuma (macOS system_profiler) ise bekleme yok → süre aşılmaz.
+            # Okuma beklenenden uzun sürerse bekleme yok → toplam süre aşılmaz.
             sample_dt = time.time() - sample_t
             remaining = duration - (time.time() - loop_start)
             if sample_dt < 1.0 and remaining > 0:

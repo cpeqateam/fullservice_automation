@@ -94,6 +94,23 @@
           />
         </div>
 
+        <!-- Arayüzden Al — firmware alanının altında, aynı X ekseninde ve genişlikte -->
+        <div class="field-row mt-2">
+          <div class="field-label"></div>
+          <v-btn
+            class="flex-grow-1"
+            variant="outlined"
+            rounded="lg"
+            size="small"
+            :loading="fetchingFirmware"
+            :disabled="!appStore.deviceInfo.brand || !appStore.deviceInfo.model || fetchingFirmware"
+            prepend-icon="mdi-download-network-outline"
+            @click="fetchFirmwareFromInterface"
+          >
+            Arayüzden Al
+          </v-btn>
+        </div>
+
         <!-- Süre -->
         <div class="field-row">
           <label class="field-label">Süre (sn)</label>
@@ -219,6 +236,36 @@
       </v-card>
     </v-dialog>
 
+    <!-- Firmware çekiliyor — kullanıcı X ile kapatamasın diye persistent -->
+    <v-dialog v-model="fetchingFirmware" max-width="360" persistent>
+      <v-card rounded="xl" class="confirm-card pa-6 text-center" elevation="4">
+        <v-progress-circular indeterminate color="primary" size="44" width="4" class="mb-4" />
+        <h3 class="text-subtitle-1 font-weight-bold mb-2">Bilgiler cihazdan çekiliyor</h3>
+        <p class="text-body-2 mb-0" style="opacity:0.75">
+          Modem arayüzüne bağlanılıyor, lütfen bekleyin…
+        </p>
+      </v-card>
+    </v-dialog>
+
+    <!-- Firmware çekme hatası — başlık/ikon hata tipine göre değişir -->
+    <v-dialog v-model="firmwareErrorDialog" max-width="480" persistent>
+      <v-card rounded="xl" class="confirm-card pa-6" elevation="4">
+        <div class="d-flex align-center mb-4">
+          <v-icon :color="firmwareErrorColor" size="26" class="mr-3">{{ firmwareErrorIcon }}</v-icon>
+          <h3 class="text-h6 font-weight-bold">{{ firmwareErrorTitle }}</h3>
+        </div>
+        <p class="text-body-2 mb-5" style="opacity:0.8">{{ firmwareErrorMessage }}</p>
+        <div class="d-flex dialog-actions">
+          <v-btn
+            :color="firmwareErrorColor"
+            rounded="lg"
+            class="flex-grow-1"
+            @click="firmwareErrorDialog = false"
+          >Tamam</v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snack.show" :color="snack.color" :timeout="5000" location="top">
       {{ snack.text }}
     </v-snackbar>
@@ -228,6 +275,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useAppStore } from '@/store/app'
+import { fetchModemFirmware } from '@/services/api'
 
 const appStore = useAppStore()
 const starting = ref(false)
@@ -240,6 +288,77 @@ const directionItems = [
   { label: 'Reverse', value: 'reverse' },
   { label: 'Normal', value: 'normal' },
 ]
+
+// ── Arayüzden firmware çekme ──────────────────────────────────────────────
+const fetchingFirmware     = ref(false)   // loading dialog kontrolü + buton spinner
+const firmwareErrorDialog  = ref(false)   // hata popup'ı
+const firmwareErrorTitle   = ref('')
+const firmwareErrorMessage = ref('')
+const firmwareErrorIcon    = ref('mdi-alert-circle-outline')
+const firmwareErrorColor   = ref('warning')
+
+function _setFwError(title, message, icon = 'mdi-alert-circle-outline', color = 'warning') {
+  firmwareErrorTitle.value   = title
+  firmwareErrorMessage.value = message
+  firmwareErrorIcon.value    = icon
+  firmwareErrorColor.value   = color
+  firmwareErrorDialog.value  = true
+}
+
+async function fetchFirmwareFromInterface() {
+  if (!appStore.deviceInfo.brand || !appStore.deviceInfo.model) {
+    _setFwError('Eksik Bilgi', 'Önce marka ve model seçmelisiniz.')
+    return
+  }
+
+  fetchingFirmware.value = true
+  try {
+    const res = await fetchModemFirmware({
+      brand: appStore.deviceInfo.brand,
+      model: appStore.deviceInfo.model,
+      modem_ip: appStore.overrides.modem_ip || undefined,
+    })
+
+    const finalFw = res.data.final_firmware
+    if (!finalFw) {
+      _setFwError(
+        'Tarih Çıkarılamadı',
+        'Cihaz arayüzünden firmware okundu ancak tarih bilgisi ayıklanamadı. Listeden seçim yapın.',
+        'mdi-calendar-remove-outline',
+        'warning',
+      )
+      return
+    }
+
+    // DB'ye yeni eklendiyse listeyi tazele ki yeni değer combobox'ta gözüksün
+    if (res.data.was_added) {
+      try {
+        await appStore.loadFirmwares()
+      } catch (err) {
+        console.warn('Firmware listesi yenilenemedi:', err)
+      }
+    }
+
+    // Combobox'a değeri ata (mevcut eşleşme veya yeni eklenmiş)
+    appStore.deviceInfo.firmware = finalFw
+  } catch (e) {
+    const status = e?.response?.status
+    const detail = e?.response?.data?.detail
+
+    // Backend zaten her hata için sade Türkçe mesaj döner; başlık + ikonu tipine göre seç
+    if (status === 404) {
+      _setFwError('Cihaz Entegre Değil', detail || 'Cihazın entegrasyonu sistemde yok.', 'mdi-package-variant-closed-remove', 'warning')
+    } else if (status === 502) {
+      _setFwError('Modeme Bağlanılamadı', detail || 'Modem arayüzü açılamadı.', 'mdi-router-network', 'error')
+    } else if (status === 503) {
+      _setFwError('Tarayıcı Hatası', detail || 'Tarayıcı başlatılamadı.', 'mdi-web-off', 'error')
+    } else {
+      _setFwError('Hata', detail || 'Beklenmedik bir hata oluştu.', 'mdi-alert-circle', 'error')
+    }
+  } finally {
+    fetchingFirmware.value = false
+  }
+}
 
 function onStart() {
   if (!appStore.requireHealthCheck()) {

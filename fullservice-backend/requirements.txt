@@ -26,3 +26,10 @@ xlsxwriter
 pandas
 numpy
 matplotlib
+
+# macOS'ta Wi-Fi track icin ZORUNLU: CoreWLAN (Apple resmi Wi-Fi API'si) — kartin
+# anlik durumunu TARAMASIZ okur, Windows'taki "netsh wlan show interfaces" gibi.
+# YEDEK YOL YOK: kurulu degilse Wi-Fi izleme testi baslamaz ve net hata verir.
+# (Eski yedek system_profiler'di; WI-FI TARAMASI yaptigi icin ayni karttan akan
+#  iperf trafigini 630 -> 201 Mbit/sn'ye dusuruyordu, bu yuzden kaldirildi.)
+pyobjc-framework-CoreWLAN; sys_platform == "darwin"

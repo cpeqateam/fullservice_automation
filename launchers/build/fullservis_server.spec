@@ -13,12 +13,17 @@ Sunucu Excel/DB katmanını kullandığı için agent'tan farklı olarak pandas,
 matplotlib, openpyxl, sqlalchemy, psycopg2 pakete DAHİL edilir.
 """
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_submodules
 
 HERE = SPECPATH                                        # launchers/build
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 BACKEND = os.path.join(REPO, "fullservice-backend")
+
+# collect_submodules paketi GERCEKTEN import edebilmeli; backend'i yola ekliyoruz.
+if BACKEND not in sys.path:
+    sys.path.insert(0, BACKEND)
 FRONTEND_DIST = os.path.join(REPO, "fullservice-frontend", "dist")
 
 APP_NAME = os.environ.get("FS_APP_NAME", "FULLSERVIS-SUNUCU")
@@ -37,10 +42,18 @@ datas = [
 hiddenimports = (
     collect_submodules("uvicorn")
     + collect_submodules("selenium")           # sunucunun kendi youtube rolü
+    # "Arayuzden Al" (firmware fetch) CPE driver'lari. common/cpe_drivers/__init__.py
+    # bunlari importlib ile DINAMIK yukler; PyInstaller dinamik import'u goremez, bu
+    # satir olmazsa paketlenmis uygulamada HIC driver bulunmaz ve buton 404 doner.
+    + collect_submodules("common.cpe_drivers")
     + ["psutil", "requests", "multipart", "fastapi", "pydantic",
        "xlsxwriter", "openpyxl", "psycopg2", "sqlalchemy",
        "matplotlib.backends.backend_agg"]
 )
+
+# macOS'ta derleniyorsa Wi-Fi track icin CoreWLAN kopruleri de girsin.
+if sys.platform == "darwin":
+    hiddenimports += ["CoreWLAN", "objc", "Foundation"]
 
 a = Analysis(
     [os.path.join(HERE, "server_app.py")],

@@ -38,6 +38,7 @@ from pydantic import BaseModel
 from common.config import load_config, DASHBOARD_DIR, LOGS_DIR
 from common.protocol import RegisterRequest, ProgressUpdate, ResultReport
 from common import firmware_db
+from server import firmware_fetch_service
 
 
 # ── app.log Tee: tüm print/stderr çıktısını logs/app.log'a da yaz ──────────────
@@ -248,6 +249,23 @@ def firmware_versions(brand: str, model: str):
         return firmware_db.get_versions(brand, model)
     except Exception as e:
         raise _firmware_503(e, f"firmware listesi ({brand}/{model})")
+
+
+class FetchFirmwareRequest(BaseModel):
+    """Firmware çekme isteği — marka, model ve modem IP'si."""
+    brand: str
+    model: str
+    modem_ip: Optional[str] = "192.168.1.1"
+
+
+@app.post("/api/firmware/fetch")
+def firmware_fetch(req: FetchFirmwareRequest):
+    """Modem arayüzünden firmware'i çeker; tarihi DB'de yoksa `firmware`
+    tablosuna ekler. Dashboard'daki "Arayüzden Al" butonu bunu kullanır.
+
+    Hatalar: 404 entegrasyon yok · 502 modeme bağlanılamadı · 503 tarayıcı ·
+    500 beklenmedik (mesajlar frontend'de başlık/ikona çevrilir)."""
+    return firmware_fetch_service.fetch(req.brand, req.model, req.modem_ip or "192.168.1.1")
 
 
 # ── Dashboard (statik) ───────────────────────────────────────

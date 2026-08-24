@@ -2,7 +2,7 @@
 """
 Wi-Fi izleme temel fonksiyon kütüphanesi — WLAN arayüzünden veri okur ve log dosyasına yazar.
 
-Windows'ta netsh, macOS'ta system_profiler komutunu kullanarak sinyal gücü, kanal,
+Windows'ta netsh, macOS'ta CoreWLAN (wifi_util_mac) kullanarak sinyal gücü, kanal,
 bant genişliği ve sistem kaynak bilgilerini toplar. WifiService tarafından periyodik
 olarak çağrılır; ham veriler metin log dosyasına eklenir.
 
@@ -31,69 +31,11 @@ import re
 def readWlan():
     """Aktif WLAN arayüzünün bilgilerini işletim sistemine göre okur ve satır listesi döner."""
     if sys.platform == "darwin":
-        # macOS implementation using system_profiler
-        cmd = "system_profiler SPAirPortDataType"
-        shellOutput = subprocess.run(cmd, shell=True, capture_output=True, text=True, creationflags=NO_WINDOW).stdout
-
-        # Parse macOS output to simulate netsh output
-        simulated_netsh = []
-
-        # Defaults
-        bssid = "00:00:00:00:00:00"
-        ssid = "Unknown"
-        state = "disconnected"
-        signal = "0%"
-        rx_rate = "0"
-        tx_rate = "0"
-        channel = "1"
-        radio = "802.11"
-        mac_address = "00:00:00:00:00:00"
-
-        is_connected = False
-
-        for line in shellOutput.split("\n"):
-            line = line.strip()
-            if line.startswith("Status: Connected"):
-                state = "connected"
-                is_connected = True
-            elif line.startswith("MAC Address:") and mac_address == "00:00:00:00:00:00":
-                mac_address = line.split(":", 1)[1].strip()
-            elif is_connected and line.startswith("Channel:"):
-                # Channel: 36 (5GHz, 160MHz) -> 36
-                ch_match = re.search(r'Channel:\s*(\d+)', line)
-                if ch_match: channel = ch_match.group(1)
-            elif is_connected and line.startswith("Signal / Noise:"):
-                # Signal / Noise: -73 dBm / -91 dBm
-                sig_match = re.search(r'Signal / Noise:\s*([-\d]+)', line)
-                if sig_match:
-                    rssi = int(sig_match.group(1))
-                    # rough conversion from RSSI to %:
-                    # -50 or better = 100%, -100 = 0%
-                    pct = max(0, min(100, 2 * (rssi + 100)))
-                    signal = f"{pct}%"
-            elif is_connected and line.startswith("Transmit Rate:"):
-                tx_rate = line.split(":", 1)[1].strip()
-                rx_rate = tx_rate # Approximation since macOS doesn't split it usually
-            elif is_connected and line.startswith("PHY Mode:"):
-                radio = line.split(":", 1)[1].strip()
-
-        # Build fake netsh output
-        simulated_netsh.append(f"    Name                   : Wi-Fi")
-        simulated_netsh.append(f"    Description            : AirPort")
-        simulated_netsh.append(f"    State                  : {state}")
-        simulated_netsh.append(f"    Physical address       : {mac_address}")
-
-        if state == "connected":
-            simulated_netsh.append(f"    SSID                   : {ssid}")
-            simulated_netsh.append(f"    BSSID                  : {bssid}")
-            simulated_netsh.append(f"    Network type           : Infrastructure")
-            simulated_netsh.append(f"    Radio type             : {radio}")
-            simulated_netsh.append(f"    Channel                : {channel}")
-            simulated_netsh.append(f"    Receive rate (Mbps)    : {rx_rate}")
-            simulated_netsh.append(f"    Transmit rate (Mbps)   : {tx_rate}")
-            simulated_netsh.append(f"    Signal                 : {signal}")
-
-        return simulated_netsh
+        # macOS okuması wifi_util_mac'e devredilir: CoreWLAN ile TARAMASIZ okur
+        # (system_profiler Wi-Fi taraması tetikliyordu, aynı karttaki iperf/YouTube
+        # trafiğini yavaşlatıyordu). Geç import — wifi_util_mac bu modülü import ediyor.
+        from common.runners import wifi_util_mac
+        return wifi_util_mac.readWlan()
     else:
         cmd = "netsh wlan show interfaces"
         shellOutput = subprocess.run(cmd, capture_output=True, text=True, creationflags=NO_WINDOW).stdout
@@ -229,20 +171,19 @@ def _bssid_windows() -> str:
 
 
 def _bssid_macos() -> str:
-    """macOS: airport -I (eski sürümlerde gerçek BSSID) → wdutil info (sudo gerekebilir)."""
-    airport = ("/System/Library/PrivateFrameworks/Apple80211.framework"
-               "/Versions/Current/Resources/airport")
-    for cmd in ([airport, "-I"], ["wdutil", "info"]):
-        try:
-            out = subprocess.run(cmd, capture_output=True, text=True).stdout
-        except Exception:
-            continue
-        for line in out.splitlines():
-            s = line.strip()
-            if s.upper().startswith("BSSID") and ":" in s:
-                val = s.split(":", 1)[1].strip()
-                if _looks_like_bssid(val):
-                    return val.lower()
+    """macOS: CoreWLAN'dan gerçek BSSID (tarama YAPMAZ, ~ms). Konum Servisleri izni
+    yoksa macOS BSSID'i gizler → '' döner ve çağıran yer varsayılanı kullanır.
+
+    Not: eski sürüm `airport -I` + `wdutil info` deniyordu; airport macOS 14.4'te
+    kaldırıldı, wdutil sudo istiyor — ikisi de boşa süreç açıyordu."""
+    try:
+        from common.runners import wifi_util_mac
+        iface = wifi_util_mac._WIFI_CLIENT.interface() if wifi_util_mac._WIFI_CLIENT else None
+        val = iface.bssid() if iface else None
+        if val and _looks_like_bssid(val):
+            return val.lower()
+    except Exception as e:
+        print(f"[WIFI] CoreWLAN BSSID alinamadi: {e}")
     return ""
 
 

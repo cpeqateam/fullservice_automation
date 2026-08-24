@@ -31,6 +31,12 @@ export const getModels    = (brand) => api.get(`/firmware/models/${encodeURIComp
 export const getVersions  = (brand, model) =>
   api.get(`/firmware/versions/${encodeURIComponent(brand)}/${encodeURIComponent(model)}`).then((r) => r.data)
 
+// Modem arayüzünden firmware çekme ("Arayüzden Al" butonu). Selenium ile headless
+// Chrome açılıp modeme login olunduğu için uzun sürer — global 8sn timeout'u ezer.
+// Çekilen tarih DB'de yoksa backend `firmware` tablosuna ekler (was_added=true).
+export const fetchModemFirmware = (payload) =>
+  api.post('/firmware/fetch', payload, { timeout: 180000 })
+
 // Tüm markaları her birinin model listesiyle birleştirir (GRK getBrands deseni).
 export const getBrands = async () => {
   const brands = await getBrandsRaw()
