@@ -30,11 +30,28 @@ def force_play_max(link: str) -> dict:
     opts = webdriver.ChromeOptions()
     opts.add_argument("--start-maximized")
     opts.add_argument("--autoplay-policy=no-user-gesture-required")
-    opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("detach", True)  # script bitince tarayıcı açık kalsın
+
+    # ── YouTube otomasyon tespitini kapat ──────────────────────────────────
+    # Belirti: ayni link ELLE acilinca sorunsuz oynuyor, Selenium ile acilinca
+    # "Bir hata olustu, daha sonra tekrar deneyin" cikip video donuyordu — hem de
+    # her makinede. Sebep bant genisligi degil; YouTube tarayicinin otomasyonla
+    # surulduugunu anlayip oynatmayi reddediyor.
+    # excludeSwitches TEK BASINA yetmiyor: navigator.webdriver hala true kaliyor.
+    opts.add_argument("--disable-blink-features=AutomationControlled")
+    opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+    opts.add_experimental_option("useAutomationExtension", False)
 
     driver = webdriver.Chrome(options=opts)
     _drivers.append(driver)
+
+    # Sayfa ACILMADAN once navigator.webdriver'i gizle (driver.get'ten ONCE olmali).
+    try:
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+        })
+    except Exception as e:
+        print(f"[YOUTUBE] webdriver gizlenemedi (video yine denenecek): {e}")
     wait = WebDriverWait(driver, 25)
 
     driver.get(link)

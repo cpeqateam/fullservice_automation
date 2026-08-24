@@ -530,6 +530,15 @@ cd fullservice_automation && git checkout aliimran
 > Kaynak klasörü silmediysen `git clone` yerine, o klasörün içinde
 > `git checkout aliimran && git pull` yeterlidir.
 
+**3.5) SADECE mac_wifi'de — CoreWLAN kur.** Wi-Fi Analiz testi buna mecburdur ve
+**derlemeden ÖNCE** kurulmalıdır, yoksa uygulamanın içine girmez:
+```bash
+python3 -m pip install pyobjc-framework-CoreWLAN
+python3 -c "import CoreWLAN; print('OK')"
+```
+Hata verirse: `python3 -m pip install 'pyobjc-framework-CoreWLAN<11'`
+(mac_cable ve Windows'ta gerekmez — orada `wifi_track` rolü yok.)
+
 **4) Derle** — makineye göre (AŞAMA A ile aynı):
 
 | Makine | Komut |
@@ -566,14 +575,6 @@ ls -la ../FULLSERVIS-SUNUCU/ayarlar ../FULLSERVIS-SUNUCU/ayarlar/certs
 > `[FIRMWARE_DB] Veritabani baglantisi yapilandirilamadi: ...`
 > Bağlantı yalnızca **açılışta bir kez** kurulur — izni düzelttikten sonra
 > uygulamayı **kapatıp yeniden aç**, yoksa düzelme etkili olmaz.
-
-**6.5) SADECE MAC'LERDE — CoreWLAN doğrula.** Derleme sırasında otomatik kurulur,
-ama kurulmadıysa Wi-Fi Analiz testi hiç başlamaz (sessizce yanlış ölçmesin diye).
-Kaynak klasörü silmeden önce, `fullservice-backend` içinde:
-```bash
-source venv/bin/activate && python -c "import CoreWLAN; print('OK')"
-```
-`OK` yazmıyorsa: `pip install -r requirements.txt` çalıştır, tekrar dene.
 
 **7) Kaynak kodu tekrar sil** (A.4) ve **8) uygulamayı bir kez çalıştırıp**
 panelde o makinenin **yeşil** olduğunu doğrula.

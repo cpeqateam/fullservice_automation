@@ -338,7 +338,9 @@ def getOneTimeInfo(wlanInfo, filename):
 
     log += "\n\n****************************** Periyodik Data Blogu ***************************************\n\n"
 
-    log += "----- Time | State, BSSID, Signal Level, Receive Rate, Transmit Rate, Channel, 802.11x | CPU Usage, RAM Usage, Power State, Battery Percentage\n\n"
+    # Sutun sirasi getSignalInfo'nun donduruu sira ile AYNI olmali:
+    #   bssid, state, signal, rx, tx, channel, radio  (bkz. getSignalInfo)
+    log += "----- Time | BSSID, State, Signal Level, Receive Rate, Transmit Rate, Channel, 802.11x | CPU Usage, RAM Usage, Power State, Battery Percentage\n\n"
 
     writeLogsToFile(log, filename)
     print(log)
