@@ -94,8 +94,9 @@ class SessionStartRequest(BaseModel):
     iperf_parallel: Optional[int] = None
     iperf_port: Optional[int] = None
     iperf_reverse: Optional[bool] = None
-    # Kullanicinin arayuzden sectigi testler (None = hepsi). Secilmeyenler hic
-    # baslatilmaz, panelde "ATLANDI" olarak gri durur.
+    # Kullanicinin arayuzden sectigi testler — DUGUM BAZINDA, "<node_id>:<test>"
+    # bicimi (or. "server:ping_modem"). None = hepsi kosar; [] = hicbiri kosmaz.
+    # Secilmeyenler hic baslatilmaz, panelde "ATLANDI" olarak gri durur.
     selected_tests: Optional[List[str]] = None
     # Cihaz bilgisi (Günlük Rutin Kontrol formundan) — log/dashboard için
     brand: Optional[str] = None

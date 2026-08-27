@@ -198,27 +198,44 @@
                 Test sürerken seçim değiştirilemez.
               </div>
 
-              <div class="tp-list">
-                <label
-                  v-for="t in appStore.availableTests"
-                  :key="t"
-                  class="tp-item"
-                  :class="{ off: appStore.deselectedTests.includes(t), locked: lockedSelection }"
-                >
-                  <input
-                    type="checkbox"
-                    class="tp-box"
-                    :checked="!appStore.deselectedTests.includes(t)"
+              <div class="tp-scroll">
+                <div v-for="g in appStore.testGroups" :key="g.nodeId" class="tp-group">
+                  <!-- Düğüm başlığı: tıklanınca o düğümün TÜM testlerini açar/kapatır -->
+                  <button
+                    type="button"
+                    class="tp-node"
                     :disabled="lockedSelection"
-                    @change="toggleTest(t)"
-                  />
-                  <span class="tp-name">{{ appStore.testLabels[t] || t }}</span>
-                  <span class="tp-nodes">{{ appStore.nodesForTest(t).length }} düğüm</span>
-                </label>
-              </div>
+                    @click="toggleNode(g)"
+                  >
+                    <v-icon
+                      :icon="g.conn === 'wifi' ? 'mdi-wifi' : 'mdi-lan-connect'"
+                      size="14"
+                      class="mr-2 opacity-60"
+                    />
+                    <span class="tp-node-name">{{ g.label }}</span>
+                    <span class="tp-node-count">{{ nodeSelectedCount(g) }}/{{ g.tests.length }}</span>
+                  </button>
 
-              <div v-if="!appStore.availableTests.length" class="tp-empty">
-                Düğümler yüklenince testler burada listelenir.
+                  <label
+                    v-for="t in g.tests"
+                    :key="t.key"
+                    class="tp-item"
+                    :class="{ off: appStore.deselectedTests.includes(t.key), locked: lockedSelection }"
+                  >
+                    <input
+                      type="checkbox"
+                      class="tp-box"
+                      :checked="!appStore.deselectedTests.includes(t.key)"
+                      :disabled="lockedSelection"
+                      @change="toggleTest(t.key)"
+                    />
+                    <span class="tp-name">{{ t.label }}</span>
+                  </label>
+                </div>
+
+                <div v-if="!appStore.testGroups.length" class="tp-empty">
+                  Düğümler yüklenince testler burada listelenir.
+                </div>
               </div>
             </div>
           </v-menu>
@@ -365,7 +382,7 @@ const testMenu = ref(false)
 const lockedSelection = computed(() => appStore.session.running)
 
 const testsBtnLabel = computed(() => {
-  const all = appStore.availableTests.length
+  const all = appStore.allTestKeys.length
   const sel = appStore.selectedTests.length
   if (!all) return 'Testler yükleniyor…'
   if (sel === all) return `Tüm testler (${all})`
@@ -373,12 +390,29 @@ const testsBtnLabel = computed(() => {
   return `${sel} / ${all} test seçili`
 })
 
-function toggleTest(t) {
+// Seçim anahtarı "<node_id>:<test>" — aynı test bir düğümde açık, diğerinde kapalı olabilir.
+function toggleTest(key) {
   if (lockedSelection.value) return
   const list = appStore.deselectedTests
-  const i = list.indexOf(t)
+  const i = list.indexOf(key)
   if (i >= 0) list.splice(i, 1)
-  else list.push(t)
+  else list.push(key)
+}
+
+function nodeSelectedCount(g) {
+  return g.tests.filter((t) => !appStore.deselectedTests.includes(t.key)).length
+}
+
+// Düğüm başlığı: hepsi açıksa hepsini kapatır, değilse hepsini açar.
+function toggleNode(g) {
+  if (lockedSelection.value) return
+  const list = appStore.deselectedTests
+  const hepsiAcik = nodeSelectedCount(g) === g.tests.length
+  for (const t of g.tests) {
+    const i = list.indexOf(t.key)
+    if (hepsiAcik && i < 0) list.push(t.key)
+    if (!hepsiAcik && i >= 0) list.splice(i, 1)
+  }
 }
 
 function selectAll() {
@@ -388,7 +422,7 @@ function selectAll() {
 
 function selectNone() {
   if (lockedSelection.value) return
-  appStore.deselectedTests.splice(0, appStore.deselectedTests.length, ...appStore.availableTests)
+  appStore.deselectedTests.splice(0, appStore.deselectedTests.length, ...appStore.allTestKeys)
 }
 
 // ── Arayüzden firmware çekme ──────────────────────────────────────────────
@@ -608,7 +642,7 @@ async function confirmAndStop() {
 }
 
 .tests-panel {
-  width: 290px;
+  width: 320px;
   padding: 10px 0 6px;
   border-radius: 12px;
   background: rgb(var(--v-theme-surface));
@@ -655,13 +689,56 @@ async function confirmAndStop() {
   border: 1px solid rgba(var(--v-theme-warning), 0.25);
 }
 
-.tp-list { display: flex; flex-direction: column; padding: 6px 6px 0; }
+/* Liste uzun (4 düğüm × testleri ≈ 17 satır) — panel taşmasın diye kaydırılır */
+.tp-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 6px 2px;
+}
+.tp-scroll::-webkit-scrollbar { width: 6px; }
+.tp-scroll::-webkit-scrollbar-thumb {
+  background: rgba(var(--v-theme-on-surface), 0.18);
+  border-radius: 3px;
+}
+
+.tp-group + .tp-group { margin-top: 4px; }
+
+.tp-node {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 2px;
+  padding: 6px 9px 4px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.tp-node:disabled { cursor: not-allowed; opacity: 0.55; }
+.tp-node-name {
+  flex: 1;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+}
+.tp-node-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--v-theme-on-surface), 0.4);
+}
+.tp-node:hover:not(:disabled) .tp-node-name,
+.tp-node:hover:not(:disabled) .tp-node-count {
+  color: rgb(var(--v-theme-primary));
+}
 
 .tp-item {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 7px 9px;
+  padding: 6px 9px 6px 18px;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.12s ease;
@@ -684,12 +761,6 @@ async function confirmAndStop() {
   font-weight: 600;
   color: rgba(var(--v-theme-on-surface), 0.9);
 }
-.tp-nodes {
-  font-size: 10.5px;
-  color: rgba(var(--v-theme-on-surface), 0.45);
-  font-variant-numeric: tabular-nums;
-}
-
 .tp-empty {
   padding: 12px 14px;
   font-size: 12px;

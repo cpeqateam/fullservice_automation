@@ -304,14 +304,31 @@ class Orchestrator:
                 model=overrides.get("model") or "Unknown",
                 firmware=overrides.get("firmware") or "Unknown",
             )
-            # Kullanıcının seçtiği testler. None/boş gelirse HEPSİ seçili sayılır
-            # (eski davranış korunur — arayüzü güncellenmemiş bir istemci de çalışır).
-            _all_roles = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])}
-            _sel = overrides.get("selected_tests")
+            # ── Test seçimi ────────────────────────────────────────────────
+            # Seçim DÜĞÜM BAZINDADIR: "server:ping_modem" gibi <node_id>:<test>
+            # çiftleri gelir. Böylece aynı test bir düğümde koşup diğerinde
+            # atlanabilir (ör. Linux'ta YouTube açık, Windows'ta kapalı).
+            #
             # DİKKAT: boş liste ile hiç gönderilmemiş olmak FARKLI şeydir.
             #   None  → istemci seçim göndermedi  → hepsi koşar (eski davranış)
             #   []    → kullanıcı hepsini kapattı → hiçbiri koşmaz
-            selected = set(_all_roles) if _sel is None else set(_sel)
+            # NOT: config.json'da anahtar "id", self.nodes içinde "node_id" olur.
+            # Burada ham config değil, kayıtlı düğümler taranır — dinamik olarak
+            # eklenmiş (config'de olmayan) bir agent da seçime dahil olsun diye.
+            _all_pairs = {f"{nid}:{r}"
+                          for nid, nd in self.nodes.items()
+                          for r in nd.get("roles", [])}
+            _sel = overrides.get("selected_tests")
+            if _sel is None:
+                selected = set(_all_pairs)
+            else:
+                # ":" içermeyen girdi = "bu test TÜM düğümlerde koşsun" (geri uyumluluk)
+                selected = set()
+                for item in _sel:
+                    if ":" in item:
+                        selected.add(item)
+                    else:
+                        selected |= {p for p in _all_pairs if p.endswith(f":{item}")}
 
             self.session = {
                 "session_id": session_id,
@@ -339,8 +356,8 @@ class Orchestrator:
             # Tüm test durumlarını sıfırla — seçilmeyenler ATLANDI olarak işaretlenir
             for node in self.nodes.values():
                 for r in node["roles"]:
-                    node["tests"][r] = (self._blank_test() if r in selected
-                                        else self._skipped_test())
+                    acik = f"{node['node_id']}:{r}" in selected
+                    node["tests"][r] = self._blank_test() if acik else self._skipped_test()
 
             online_nodes = [self._node_view(n) for n in self.nodes.values()]
             started_at = self.session["started_at"]
@@ -349,7 +366,8 @@ class Orchestrator:
         # DB: oturum satırını (test_session) oluştur — lock dışında (ağ/DB I/O).
         # has_* bayrakları GERÇEKTEN KOŞULACAK testlere göre kurulur: kullanıcı bir
         # testin tikini kaldırdıysa DB'de "bu oturumda vardı" demek yanlış olur.
-        roles_all = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])} & selected
+        # has_* bayrakları GERÇEKTEN koşacak testlere göre (düğüm öneki atılır)
+        roles_all = {p.split(":", 1)[1] for p in selected}
         db_session_id = db_service.create_session(
             device.get("brand"), device.get("model"), device.get("firmware"),
             started_at,
@@ -376,7 +394,7 @@ class Orchestrator:
         for nv in online_nodes:
             # SEÇİM FİLTRESİ: kullanıcının tikini kaldırdığı testler agent'a hiç
             # gönderilmez. Düğümün tüm rolleri kapatılmışsa o düğüme komut gitmez.
-            roles = [r for r in nv["roles"] if r in selected]
+            roles = [r for r in nv["roles"] if f"{nv['node_id']}:{r}" in selected]
             if not roles:
                 continue
             if nv["is_server"]:

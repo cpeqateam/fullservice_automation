@@ -59,9 +59,10 @@ export const useAppStore = defineStore('app', {
     overrides:  { duration: 54000, modem_ip: '', internet_ip: '', youtube_link: '' },
     iperfParams: { direction: 'reverse', parallel: 10, port: 5201 },
 
-    // Test seçimi. Varsayılan HEPSİ AÇIK olduğu için burada seçilenleri değil,
-    // kullanıcının KAPATTIKLARINI tutuyoruz: boş dizi = tüm testler koşacak.
-    // Böylece backend yeni bir test tipi eklediğinde o da kendiliğinden seçili gelir.
+    // Test seçimi DÜĞÜM BAZINDA: her girdi "<node_id>:<test>" (ör. "server:youtube").
+    // Varsayılan HEPSİ AÇIK olduğu için burada seçilenleri değil, kullanıcının
+    // KAPATTIKLARINI tutuyoruz: boş dizi = tüm testler koşacak. Böylece yeni bir
+    // düğüm/test eklendiğinde o da kendiliğinden seçili gelir.
     deselectedTests: [],
 
     // Firmware DB
@@ -83,28 +84,39 @@ export const useAppStore = defineStore('app', {
   getters: {
     nodeCount:     (s) => s.nodes.length,
 
-    // Sistemde koşulabilen tüm test tipleri (düğüm rollerinin birleşimi).
-    // Sıra test_labels'taki sıraya göre sabitlenir ki panel her açılışta aynı görünsün.
-    availableTests: (s) => {
-      const set = new Set()
-      for (const n of s.nodes) for (const r of (n.roles || [])) set.add(r)
+    // Seçim panelinin listesi: düğüm düğüm gruplanmış (node, test) çiftleri.
+    // Test sırası test_labels'taki sırayı izler ki panel her açılışta aynı görünsün.
+    testGroups: (s) => {
       const order = Object.keys(s.testLabels || {})
-      return [...set].sort((a, b) => {
-        const ia = order.indexOf(a), ib = order.indexOf(b)
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
-      })
+      return s.nodes.map((n) => ({
+        nodeId: n.node_id,
+        label:  n.label,
+        conn:   n.conn,
+        tests: [...(n.roles || [])]
+          .sort((a, b) => {
+            const ia = order.indexOf(a), ib = order.indexOf(b)
+            return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+          })
+          .map((r) => ({ test: r, key: `${n.node_id}:${r}`, label: s.testLabels[r] || r })),
+      })).filter((g) => g.tests.length)
     },
 
-    // Testi başlatınca koşacak olanlar = mevcut testler − kapatılanlar
+    // Sistemdeki tüm (düğüm, test) çiftleri — "<node_id>:<test>"
+    allTestKeys: (s) => {
+      const out = []
+      for (const n of s.nodes) for (const r of (n.roles || [])) out.push(`${n.node_id}:${r}`)
+      return out
+    },
+
+    // Testi başlatınca koşacak olanlar = tüm çiftler − kapatılanlar
     selectedTests: (s) => {
-      const set = new Set()
-      for (const n of s.nodes) for (const r of (n.roles || [])) set.add(r)
-      return [...set].filter((t) => !s.deselectedTests.includes(t))
+      const out = []
+      for (const n of s.nodes) for (const r of (n.roles || [])) {
+        const k = `${n.node_id}:${r}`
+        if (!s.deselectedTests.includes(k)) out.push(k)
+      }
+      return out
     },
-
-    // Bir testi hangi düğümler koşuyor? (seçim panelinde ipucu olarak gösterilir)
-    nodesForTest: (s) => (test) =>
-      s.nodes.filter((n) => (n.roles || []).includes(test)).map((n) => n.label),
 
     onlineCount:   (s) => s.nodes.filter((n) => n.online).length,
     sessionStatus: (s) => (s.session.running ? 'running' : s.session.session_id ? 'done' : 'idle'),
