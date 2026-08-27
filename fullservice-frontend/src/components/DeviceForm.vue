@@ -159,6 +159,71 @@
           />
         </div>
 
+        <!-- Koşulacak Testler — varsayılan hepsi seçili, tik kaldırılan test hiç başlamaz -->
+        <div class="field-row">
+          <label class="field-label">Testler</label>
+          <v-menu
+            v-model="testMenu"
+            :close-on-content-click="false"
+            location="bottom end"
+            offset="6"
+          >
+            <template #activator="{ props }">
+              <v-btn
+                v-bind="props"
+                variant="tonal"
+                density="comfortable"
+                block
+                rounded="lg"
+                class="tests-btn"
+                :append-icon="testMenu ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+              >
+                <v-icon icon="mdi-format-list-checks" size="18" class="mr-2" />
+                {{ testsBtnLabel }}
+              </v-btn>
+            </template>
+
+            <div class="tests-panel">
+              <div class="tp-head">
+                <span class="tp-title">Koşulacak Testler</span>
+                <div class="tp-bulk">
+                  <button type="button" class="tp-link" :disabled="lockedSelection" @click="selectAll">Tümü</button>
+                  <span class="tp-sep">·</span>
+                  <button type="button" class="tp-link" :disabled="lockedSelection" @click="selectNone">Hiçbiri</button>
+                </div>
+              </div>
+
+              <div v-if="lockedSelection" class="tp-locked">
+                <v-icon icon="mdi-lock-outline" size="14" class="mr-1" />
+                Test sürerken seçim değiştirilemez.
+              </div>
+
+              <div class="tp-list">
+                <label
+                  v-for="t in appStore.availableTests"
+                  :key="t"
+                  class="tp-item"
+                  :class="{ off: appStore.deselectedTests.includes(t), locked: lockedSelection }"
+                >
+                  <input
+                    type="checkbox"
+                    class="tp-box"
+                    :checked="!appStore.deselectedTests.includes(t)"
+                    :disabled="lockedSelection"
+                    @change="toggleTest(t)"
+                  />
+                  <span class="tp-name">{{ appStore.testLabels[t] || t }}</span>
+                  <span class="tp-nodes">{{ appStore.nodesForTest(t).length }} düğüm</span>
+                </label>
+              </div>
+
+              <div v-if="!appStore.availableTests.length" class="tp-empty">
+                Düğümler yüklenince testler burada listelenir.
+              </div>
+            </div>
+          </v-menu>
+        </div>
+
       </v-form>
     </div>
 
@@ -169,7 +234,7 @@
         color="primary"
         size="default"
         prepend-icon="mdi-play"
-        :disabled="appStore.session.running"
+        :disabled="appStore.session.running || !appStore.selectedTests.length"
         block
         rounded="lg"
         class="mb-3"
@@ -177,6 +242,9 @@
       >
         FULL Servis Başlat
       </v-btn>
+      <p v-if="!appStore.selectedTests.length" class="no-test-warn">
+        En az bir test seçilmeli.
+      </p>
       <v-btn
         color="error"
         size="default"
@@ -273,7 +341,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useAppStore } from '@/store/app'
 import { fetchModemFirmware } from '@/services/api'
 
@@ -288,6 +356,40 @@ const directionItems = [
   { label: 'Reverse', value: 'reverse' },
   { label: 'Normal', value: 'normal' },
 ]
+
+// ── Test seçimi ───────────────────────────────────────────────────────────
+// Varsayılan HEPSİ seçilidir; store yalnızca kullanıcının KAPATTIKLARINI tutar.
+// Test sürerken seçim kilitlenir: listeyi oturum başlarken agent'lara gönderiyoruz,
+// koşum ortasında tik açmak o testi başlatmaz — arayüz bunu vaat etmemeli.
+const testMenu = ref(false)
+const lockedSelection = computed(() => appStore.session.running)
+
+const testsBtnLabel = computed(() => {
+  const all = appStore.availableTests.length
+  const sel = appStore.selectedTests.length
+  if (!all) return 'Testler yükleniyor…'
+  if (sel === all) return `Tüm testler (${all})`
+  if (sel === 0) return 'Hiçbir test seçili değil'
+  return `${sel} / ${all} test seçili`
+})
+
+function toggleTest(t) {
+  if (lockedSelection.value) return
+  const list = appStore.deselectedTests
+  const i = list.indexOf(t)
+  if (i >= 0) list.splice(i, 1)
+  else list.push(t)
+}
+
+function selectAll() {
+  if (lockedSelection.value) return
+  appStore.deselectedTests.splice(0)
+}
+
+function selectNone() {
+  if (lockedSelection.value) return
+  appStore.deselectedTests.splice(0, appStore.deselectedTests.length, ...appStore.availableTests)
+}
 
 // ── Arayüzden firmware çekme ──────────────────────────────────────────────
 const fetchingFirmware     = ref(false)   // loading dialog kontrolü + buton spinner
@@ -494,4 +596,110 @@ async function confirmAndStop() {
   color: rgba(var(--v-theme-on-surface), 0.85);
 }
 .dialog-actions { gap: 12px; }
+
+/* ── Test seçim paneli ──────────────────────────────────────────────────────
+   Renkler Vuetify tema değişkenlerinden türetilir (--v-theme-*), böylece açık
+   ve karanlık temada ayrı kural yazmadan doğru görünür. */
+.tests-btn {
+  justify-content: flex-start;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tests-panel {
+  width: 290px;
+  padding: 10px 0 6px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.tp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 8px;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+.tp-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(var(--v-theme-on-surface), 0.75);
+}
+.tp-bulk { display: flex; align-items: center; gap: 6px; }
+.tp-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+}
+.tp-link:disabled { opacity: 0.4; cursor: not-allowed; }
+.tp-sep { color: rgba(var(--v-theme-on-surface), 0.3); font-size: 11px; }
+
+.tp-locked {
+  display: flex;
+  align-items: center;
+  margin: 8px 10px 2px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  color: rgb(var(--v-theme-warning));
+  background: rgba(var(--v-theme-warning), 0.10);
+  border: 1px solid rgba(var(--v-theme-warning), 0.25);
+}
+
+.tp-list { display: flex; flex-direction: column; padding: 6px 6px 0; }
+
+.tp-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.tp-item:hover { background: rgba(var(--v-theme-on-surface), 0.06); }
+.tp-item.locked { cursor: not-allowed; opacity: 0.55; }
+.tp-item.off .tp-name { opacity: 0.45; text-decoration: line-through; }
+
+.tp-box {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  accent-color: rgb(var(--v-theme-primary));
+  cursor: inherit;
+}
+
+.tp-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.9);
+}
+.tp-nodes {
+  font-size: 10.5px;
+  color: rgba(var(--v-theme-on-surface), 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.5);
+}
+
+.no-test-warn {
+  margin: -6px 0 10px;
+  text-align: center;
+  font-size: 11.5px;
+  color: rgb(var(--v-theme-warning));
+}
 </style>

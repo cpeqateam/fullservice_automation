@@ -59,6 +59,11 @@ export const useAppStore = defineStore('app', {
     overrides:  { duration: 54000, modem_ip: '', internet_ip: '', youtube_link: '' },
     iperfParams: { direction: 'reverse', parallel: 10, port: 5201 },
 
+    // Test seçimi. Varsayılan HEPSİ AÇIK olduğu için burada seçilenleri değil,
+    // kullanıcının KAPATTIKLARINI tutuyoruz: boş dizi = tüm testler koşacak.
+    // Böylece backend yeni bir test tipi eklediğinde o da kendiliğinden seçili gelir.
+    deselectedTests: [],
+
     // Firmware DB
     brandsData:      [],     // [{ title, value, models: [...] }]
     firmwareOptions: [],
@@ -77,6 +82,30 @@ export const useAppStore = defineStore('app', {
 
   getters: {
     nodeCount:     (s) => s.nodes.length,
+
+    // Sistemde koşulabilen tüm test tipleri (düğüm rollerinin birleşimi).
+    // Sıra test_labels'taki sıraya göre sabitlenir ki panel her açılışta aynı görünsün.
+    availableTests: (s) => {
+      const set = new Set()
+      for (const n of s.nodes) for (const r of (n.roles || [])) set.add(r)
+      const order = Object.keys(s.testLabels || {})
+      return [...set].sort((a, b) => {
+        const ia = order.indexOf(a), ib = order.indexOf(b)
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+      })
+    },
+
+    // Testi başlatınca koşacak olanlar = mevcut testler − kapatılanlar
+    selectedTests: (s) => {
+      const set = new Set()
+      for (const n of s.nodes) for (const r of (n.roles || [])) set.add(r)
+      return [...set].filter((t) => !s.deselectedTests.includes(t))
+    },
+
+    // Bir testi hangi düğümler koşuyor? (seçim panelinde ipucu olarak gösterilir)
+    nodesForTest: (s) => (test) =>
+      s.nodes.filter((n) => (n.roles || []).includes(test)).map((n) => n.label),
+
     onlineCount:   (s) => s.nodes.filter((n) => n.online).length,
     sessionStatus: (s) => (s.session.running ? 'running' : s.session.session_id ? 'done' : 'idle'),
     brandOptions:  (s) => s.brandsData.map((b) => b.title),
@@ -196,6 +225,10 @@ export const useAppStore = defineStore('app', {
       body.iperf_reverse  = ip.direction === 'reverse'
       body.iperf_parallel = parseInt(ip.parallel)
       body.iperf_port     = parseInt(ip.port)
+
+      // Seçilen testler. Backend boş/None gelirse hepsini koşar; bu yüzden
+      // kullanıcı hepsini kapatmışsa da listeyi açıkça gönderiyoruz.
+      body.selected_tests = this.selectedTests
 
       const d = this.deviceInfo
       if (d.brand)    body.brand    = d.brand

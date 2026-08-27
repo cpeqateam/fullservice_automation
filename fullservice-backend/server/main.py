@@ -26,7 +26,7 @@ for _stream in (sys.stdout, sys.stderr):
 # Proje kökünü import yoluna ekle (common'a erişim için)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from typing import Optional
+from typing import List, Optional
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
@@ -94,6 +94,9 @@ class SessionStartRequest(BaseModel):
     iperf_parallel: Optional[int] = None
     iperf_port: Optional[int] = None
     iperf_reverse: Optional[bool] = None
+    # Kullanicinin arayuzden sectigi testler (None = hepsi). Secilmeyenler hic
+    # baslatilmaz, panelde "ATLANDI" olarak gri durur.
+    selected_tests: Optional[List[str]] = None
     # Cihaz bilgisi (Günlük Rutin Kontrol formundan) — log/dashboard için
     brand: Optional[str] = None
     model: Optional[str] = None

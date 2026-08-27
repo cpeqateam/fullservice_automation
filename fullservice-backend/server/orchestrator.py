@@ -76,6 +76,7 @@ class Orchestrator:
         self.session = {"session_id": None, "running": False,
                         "started_at": None, "ended_at": None, "params": {},
                         "db_session_id": None,
+                        "selected_tests": None,   # None = henüz oturum yok
                         "device": {"brand": None, "model": None, "firmware": None}}
 
         # Sunucu-yerel testler için durdurma bayrağı + thread'ler
@@ -86,6 +87,12 @@ class Orchestrator:
     def _blank_test() -> dict:
         """Bir test için başlangıç (idle) durum sözlüğü döner."""
         return {"progress": 0.0, "status": TestStatus.IDLE.value, "message": "", "updated": None}
+
+    @staticmethod
+    def _skipped_test() -> dict:
+        """Kullanıcının seçmediği test için durum sözlüğü — hiç başlatılmaz."""
+        return {"progress": 0.0, "status": TestStatus.SKIPPED.value,
+                "message": "Bu oturumda seçilmedi", "updated": None}
 
     # ── Kayıt / heartbeat ────────────────────────────────────
     def register(self, req: dict):
@@ -111,7 +118,7 @@ class Orchestrator:
             if not node.get("first_seen_at"):
                 node["first_seen_at"] = datetime.now().isoformat(timespec="seconds")
 
-    _TERMINAL = {"completed", "error", "stopped"}
+    _TERMINAL = {"completed", "error", "stopped", "skipped"}
 
     # Bildirimi/tamamlanmayı belirleyen "ölçüm" testleri. Torrent ve youtube sonsuz
     # yük basıcıdır (ancak Durdur'a basınca biter), iperf_server yalnızca dinleyicidir —
@@ -127,8 +134,14 @@ class Orchestrator:
             for r in node.get("roles", []):
                 if r not in self._COMPLETION_ROLES:
                     continue
+                st = node["tests"].get(r, {}).get("status")
+                # Seçilmeyen test ne bekletir ne de "bitti" saydırır; yok sayılır.
+                # (Aksi halde tüm ölçüm testleri kapatıldığında oturum daha
+                #  başlar başlamaz "bitti" sayılıp bildirim giderdi.)
+                if st == TestStatus.SKIPPED.value:
+                    continue
                 has_any = True
-                if node["tests"].get(r, {}).get("status") not in self._TERMINAL:
+                if st not in self._TERMINAL:
                     return False
         return has_any
 
@@ -291,9 +304,21 @@ class Orchestrator:
                 model=overrides.get("model") or "Unknown",
                 firmware=overrides.get("firmware") or "Unknown",
             )
+            # Kullanıcının seçtiği testler. None/boş gelirse HEPSİ seçili sayılır
+            # (eski davranış korunur — arayüzü güncellenmemiş bir istemci de çalışır).
+            _all_roles = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])}
+            _sel = overrides.get("selected_tests")
+            # DİKKAT: boş liste ile hiç gönderilmemiş olmak FARKLI şeydir.
+            #   None  → istemci seçim göndermedi  → hepsi koşar (eski davranış)
+            #   []    → kullanıcı hepsini kapattı → hiçbiri koşmaz
+            selected = set(_all_roles) if _sel is None else set(_sel)
+
             self.session = {
                 "session_id": session_id,
                 "running": True,
+                # Panelin hangi testlerin atlandığını bilmesi + seçim panelini
+                # test sürerken kilitlemesi için durumla birlikte sunulur.
+                "selected_tests": sorted(selected),
                 "started_at": datetime.now().isoformat(timespec="seconds"),
                 "ended_at": None,
                 "params": params.dict() if hasattr(params, "dict") else params.model_dump(),
@@ -311,18 +336,20 @@ class Orchestrator:
                 # error_log için: app.log'un bu oturum başındaki byte konumu
                 "log_offset": log_capture.current_size(),
             }
-            # Tüm test durumlarını sıfırla
+            # Tüm test durumlarını sıfırla — seçilmeyenler ATLANDI olarak işaretlenir
             for node in self.nodes.values():
                 for r in node["roles"]:
-                    node["tests"][r] = self._blank_test()
+                    node["tests"][r] = (self._blank_test() if r in selected
+                                        else self._skipped_test())
 
             online_nodes = [self._node_view(n) for n in self.nodes.values()]
             started_at = self.session["started_at"]
             device = dict(self.session["device"])
 
         # DB: oturum satırını (test_session) oluştur — lock dışında (ağ/DB I/O).
-        # Hangi test tipleri var? (has_* bayrakları için tüm düğümlerin rollerinin birleşimi)
-        roles_all = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])}
+        # has_* bayrakları GERÇEKTEN KOŞULACAK testlere göre kurulur: kullanıcı bir
+        # testin tikini kaldırdıysa DB'de "bu oturumda vardı" demek yanlış olur.
+        roles_all = {r for n in self.config.get("nodes", []) for r in n.get("roles", [])} & selected
         db_session_id = db_service.create_session(
             device.get("brand"), device.get("model"), device.get("firmware"),
             started_at,
@@ -347,16 +374,18 @@ class Orchestrator:
         results: dict[str, bool] = {}
 
         for nv in online_nodes:
-            roles = nv["roles"]
+            # SEÇİM FİLTRESİ: kullanıcının tikini kaldırdığı testler agent'a hiç
+            # gönderilmez. Düğümün tüm rolleri kapatılmışsa o düğüme komut gitmez.
+            roles = [r for r in nv["roles"] if r in selected]
             if not roles:
                 continue
             if nv["is_server"]:
                 self._run_server_local(session_id, roles, params)
                 dispatched.append(nv["node_id"])
             elif nv["online"] and nv["ip"] and nv["agent_port"]:
-                def _dispatch(n=nv):
+                def _dispatch(n=nv, _roles=roles):
                     """Bir agent'a start komutunu gönderip sonucu results'a yazar (thread hedefi)."""
-                    results[n["node_id"]] = self._send_start(n, session_id, n["roles"], params)
+                    results[n["node_id"]] = self._send_start(n, session_id, _roles, params)
                 th = threading.Thread(target=_dispatch, daemon=True)
                 th.start()
                 agent_threads.append(th)
@@ -548,6 +577,7 @@ class Orchestrator:
             self.session = {"session_id": None, "running": False,
                             "started_at": None, "ended_at": None, "params": {},
                             "db_session_id": None,
+                            "selected_tests": None,
                             "device": {"brand": None, "model": None, "firmware": None}}
             for node in self.nodes.values():
                 for r in node["roles"]:

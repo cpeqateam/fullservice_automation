@@ -43,6 +43,7 @@ class TestStatus(str, Enum):
     COMPLETED = "completed"
     ERROR = "error"
     STOPPED = "stopped"
+    SKIPPED = "skipped"   # kullanici bu testi secmedi — hic baslatilmadi
 
 
 # ─────────────────────────────────────────────────────────────
